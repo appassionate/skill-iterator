@@ -1,2 +1,2 @@
 # iter_skill
-a skill aims to training target skill
+a skill aims to train target skill
