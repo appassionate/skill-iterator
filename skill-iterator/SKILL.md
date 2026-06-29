@@ -1,16 +1,8 @@
 ---
 name: skill-iterator
-description: >-
-  Iteratively improve an existing skill to make it more generalized, robust, and reusable.
-  Triggers via `iter_skill({skill_name})` or when the user says: "iterate skill",
-  "improve skill", "optimize skill", "generalize skill", "refactor skill", "harden skill",
-  "review skill", "make this skill better/broader/more reliable", "this skill is too rigid",
-  "the skill keeps failing", or "look at these eval results and fix the skill".
-  中文：迭代技能、改进技能、优化技能、泛化技能、重构技能、加固技能、审查技能。
-  Does NOT trigger on "create a skill" or "write a skill" — use skill-creator for those.
-  Also triggers when a skill has been tested and needs refinement based on feedback or
-  self-assessment, even without the word "iterate".
-version: 3.8.0
+description: "Iteratively improve an existing skill to make it more generalized, robust, and reusable. Triggers via `iter_skill({skill_name})` or when the user says: \"iterate skill\", \"improve skill\", \"optimize skill\", \"generalize skill\", \"refactor skill\", \"harden skill\", \"review skill\", \"make this skill better/broader/more reliable\", \"this skill is too rigid\", \"the skill keeps failing\", or \"look at these eval results and fix the skill\". 中文：迭代技能、改进技能、优化技能、泛化技能、重构技能、加固技能、审查技能。 Does NOT trigger on \"create a skill\" or \"write a skill\" — use skill-creator for those. Also triggers when a skill has been tested and needs refinement based on feedback or self-assessment, even without the word \"iterate\"."
+version: 3.11.0
+install_method: upload
 ---
 
 # skill-iterator
@@ -61,7 +53,7 @@ Once located, read every file in the skill directory — SKILL.md plus all bundl
 
 ### Step 2: Parse User Input
 
-- **Rawdata**: test prompts, sample data, or reference materials to exercise against. If none provided, generate 3-5 synthetic test cases: 2 happy-path, 2 edge cases, 1 error case, covering the skill's domain.
+- **Rawdata**: test prompts, sample data, and any files the user uploads alongside their request — sample datasets, reference documents, configuration files, or anything the target skill would consume. Collect **all** user-uploaded files into `rawdata/` at workspace setup; completeness ensures every iteration is fully reproducible. Missing inputs make it impossible to verify earlier results or build on them in later rounds. The directory is shared read-only across iterations for consistent comparison. If no files are provided, generate 3-5 synthetic test cases: 2 happy-path, 2 edge cases, 1 error case, covering the skill's domain.
 - **Requirements**: explicit improvement goals. If none, default to self-evaluation mode.
 - **Iteration count**: default 3, adjustable.
 
@@ -83,7 +75,7 @@ pipeline on the pipeline.
 
 ```
 iter_skill({target_skill_name})/
-├── rawdata/                        # Shared, read-only across all iterations
+├── rawdata/                        # Must be complete for reproducibility; user-uploaded files + synthetic test cases
 │   └── (test cases, sample data)
 ├── iter.0001/
 │   ├── todo.md                     # Iteration contract (see references/todo-template.md)
@@ -91,10 +83,11 @@ iter_skill({target_skill_name})/
 │   ├── changelog.md                # Text modifications with reasoning (see references/changelog-template.md)
 │   ├── 01.train/
 │   │   ├── skill/                  # Complete copy of target skill for this round
-│   │   └── result/                 # Outputs, logs, and friction notes from exercise
+│   │   └── execute/                # Target skill's execution workspace — outputs, logs, and friction notes
 │   ├── 02.validation/
 │   │   ├── generalization.md       # Problem → solution → generalized strategy (see references/generalization-template.md)
-│   │   └── benchmark.md            # Assessment snapshot + performance metrics (see references/benchmark-template.md)
+│   │   ├── benchmark.md            # Assessment snapshot + performance metrics (see references/benchmark-template.md)
+│   │   └── automation.md           # Tedium analysis + automation opportunities (see references/automation-template.md)
 │   └── 03.output/                  # Improved skill — ready to deploy
 │       └── (complete skill directory)
 ├── iter.0002/                      # (same structure, skill/ copied from iter.0001/03.output/)
@@ -103,11 +96,13 @@ iter_skill({target_skill_name})/
 
 ### Key Rules
 
-- **rawdata/ is read-only.** Never modify after first iteration. All rounds share the same rawdata for consistent comparison.
+- **rawdata/ must be complete.** Collect all user-uploaded files, test prompts, and reference materials at workspace setup. Completeness is the priority — every input the target skill consumes must be present so that any iteration can be fully reproduced. The directory is shared read-only across all rounds to ensure consistent comparison.
 - **Chain of custody.** Each iteration's `01.train/skill/` is a complete copy from the previous `03.output/` (or the original skill for iter.0001). This makes each iteration self-contained and traceable.
 - **todo.md drives the iteration.** Created first, referenced throughout, verified at the end.
-- **Validation drives improvement.** Each iteration produces four reporting artifacts: summarize.md (walkthrough + todo review + carryover), changelog.md (text changes + reasoning), generalization.md (problem → solution → generalized strategy), and benchmark.md (assessment snapshot + performance metrics). summarize.md and changelog.md live at the iteration root (they describe changes relative to prior iterations); generalization.md and benchmark.md live in `02.validation/` (they focus on skill capability). Together they form the next round's agenda. Do not rush this stage — without thorough validation, the next iteration starts blind.
+- **Validation drives improvement.** Each iteration produces five reporting artifacts: summarize.md (walkthrough + todo review + carryover), changelog.md (text changes + reasoning), generalization.md (problem → solution → generalized strategy), benchmark.md (assessment snapshot + performance metrics), and automation.md (tedium analysis + automation opportunities). summarize.md and changelog.md live at the iteration root (they describe changes relative to prior iterations); generalization.md, benchmark.md, and automation.md live in `02.validation/` (they focus on skill capability and process improvement). Together they form the next round's agenda. Do not rush this stage — without thorough validation, the next iteration starts blind.
 - **03.output/ is the deliverable.** The final iteration's output is the improved skill, ready to install.
+- **`execute/` is the target skill's workspace, not a results dump.** Named to emphasize that the target skill *actively performs its tasks here* — generating outputs, running scripts, encountering friction. It's an execution environment, not a passive storage folder. This distinction matters: when reviewing `execute/` during validation, look for process artifacts (logs, intermediate states, workarounds) not just final outputs.
+- **Script the scaffolding.** The workspace setup pattern (create directories, copy skill from previous output, verify line counts) repeats identically in every iteration. When running 3+ iterations, create a Python script (e.g., `setup_iter.py`) in `01.train/execute/` to automate it. This eliminates the single most repetitive step in the pipeline and prevents drift between iterations.
 
 ---
 
@@ -119,11 +114,11 @@ Each iteration follows: **Prepare → Train → Validate → Output**.
 
 Create `todo.md` following `references/todo-template.md`. Two sections, each as a table
 with columns: **#** (sequential ID), **Status** (`done` / `plan` / `pending` / `deferred` / `dropped`),
-**Content** (abstract description in English), **Added in** (which iteration introduced the item).
+**Content** (see sourcing rules below), **Added in** (which iteration introduced the item).
 Use `plan` for items targeted for improvement in the current iteration.
 
-1. **User Requirements** — explicit goals from the user (or self-evaluation targets for iter.0001 with no specific goal). For iter.0002+, carry forward all prior items and append new ones.
-2. **Validation Generated** — carryover items from the previous iteration's summarize.md (both "This Iteration Review" unresolved items and "Validation Generated" entries). Mark "N/A" for iter.0001.
+1. **User Requirements** — quote the user's original input text verbatim (preserve their language, phrasing, and wording). If the user wrote in Chinese, the Content column contains Chinese; if English, English. For iter.0002+, carry forward all prior items and append new ones.
+2. **Validation Generated** — carryover items from the previous iteration's summarize.md (both "This Iteration Review" unresolved items and "Validation Generated" entries). These use formatted, standardized descriptions (not raw quotes) since they represent distilled, cross-iteration knowledge. Mark "N/A" for iter.0001.
 
 ### Stage 2: Train (`01.train/`)
 
@@ -132,7 +127,7 @@ Use `plan` for items targeted for improvement in the current iteration.
 **Exercise:** Apply the skill against every rawdata item. This means *fully executing* the
 target skill's tasks — actually performing every step the skill describes, not just
 reading the instructions and assessing them conceptually. If the skill generates reports,
-generate them. If it processes files, process them. Record into `01.train/result/`:
+generate them. If it processes files, process them. Record into `01.train/execute/`:
 - Generated outputs and decision logs
 - Failure notes (where the skill was unclear or wrong)
 - Friction log (timestamped difficulties: ambiguous instructions, missing edge cases, broken references)
@@ -140,7 +135,7 @@ generate them. If it processes files, process them. Record into `01.train/result
 
 When parts of the task are scriptable (data transformation, file manipulation, structured
 output), use Python scripts rather than pure reasoning. Persist useful scripts in
-`01.train/result/` — this continuous internalization of reusable logic feeds
+`01.train/execute/` — this continuous internalization of reusable logic feeds
 generalization.md with concrete, verifiable patterns rather than abstract assessments.
 
 **Execution methodology for new tasks and scenarios:**
@@ -153,6 +148,14 @@ generalization.md with concrete, verifiable patterns rather than abstract assess
    structured output, write a script. A script produces deterministic, verifiable output;
    reasoning about the same task risks subtle hallucination (plausible but wrong results
    that look correct). Scripts ground the exercise in reality.
+3. **Automate repetitive steps across iterations.** If a step is performed identically in
+   two or more iterations (e.g., data preprocessing, file format conversion, workspace setup,
+   validation checks), extract it into a reusable Python script and persist it in
+   `01.train/execute/`. Subsequent iterations should invoke the script rather than redo the
+   work manually. This reduces friction, eliminates drift between iterations, and produces
+   concrete artifacts that feed generalization.md. When in doubt, prefer Python — it has the
+   broadest ecosystem for the data-processing and file-manipulation tasks typical in skill
+   exercise.
 
 **Assess and Improve:** Run the Assessment Framework (below) informed by the exercise results and todo.md. Apply improvements directly to `01.train/skill/`.
 
@@ -170,15 +173,19 @@ Improvement principles (with their associated pitfalls):
 
 This stage directly determines the quality of all subsequent iterations. Rushing it produces compounding errors. *Pitfall: Skipping Validation — treating the walkthrough as a formality. The summarize.md is the memory connecting iterations; without it, the next round starts blind and repeats the same mistakes.*
 
-Stage 3 produces four artifacts. Two are **iteration-level reports** at the iteration root — they describe what changed relative to prior iterations. Two are **validation artifacts** in `02.validation/` — they focus on the skill's capability.
+**Core principle: make implicit workflow steps explicit.** During training, the model often relies on assumptions — unstated steps, implicit data formats, or reasoning shortcuts that worked but were never documented. Validation is where those hidden dependencies must surface. Every artifact in this stage serves this principle: summarize.md captures what happened, changelog.md captures what changed and why, generalization.md captures what was learned, benchmark.md captures how well the skill performs, and automation.md captures what should be mechanized. If a step was implicit during training, it should be explicit in validation.
 
-**1. Walkthrough (summarize.md, at iteration root):** Re-read every file in `01.train/result/`. Create `summarize.md` following `references/summarize-template.md`. Contains: the friction-and-resolution table, a **This Iteration Review** section (closing the loop on items marked `plan` in todo.md — what was done, what wasn't), and a **Validation Generated** section formatted identically to todo.md. The Validation Generated section includes both unresolved items from this iteration and new items the model independently identified as areas the target skill should improve (marked `plan`). This section is the direct carryover source for the next iteration's todo.md.
+Stage 3 produces five artifacts. Two are **iteration-level reports** at the iteration root — they describe what changed relative to prior iterations. Three are **validation artifacts** in `02.validation/` — they focus on the skill's capability and process improvement.
+
+**1. Walkthrough (summarize.md, at iteration root):** Re-read every file in `01.train/execute/`. Create `summarize.md` following `references/summarize-template.md`. Contains: the friction-and-resolution table, a **This Iteration Review** section (closing the loop on items marked `plan` in todo.md — what was done, what wasn't), and a **Validation Generated** section formatted identically to todo.md. The Validation Generated section includes both unresolved items from this iteration and new items the model independently identified as areas the target skill should improve (marked `plan`). This section is the direct carryover source for the next iteration's todo.md.
 
 **2. Changelog (changelog.md, at iteration root):** Create `changelog.md` following `references/changelog-template.md`. Records **what text was changed and why** — each row identifies the file, section, the change made, and the reasoning behind it. This captures design decisions for traceability across iterations.
 
 **3. Generalization (02.validation/generalization.md):** Create `generalization.md` following `references/generalization-template.md`. For each problem encountered, document: the specific problem, how it was solved, and the **generalized strategy** — the broader principle that applies beyond this specific case. This file is where concrete friction points become reusable knowledge. It informs the next iteration's todo.md decisions alongside summarize.md.
 
 **4. Benchmark (02.validation/benchmark.md):** Create `benchmark.md` following `references/benchmark-template.md`. Tracks the target skill's health across iterations: performance metrics (rawdata pass rate, friction count, line counts), assessment snapshot (6-dimension ratings), and generalization metrics (strategies generated vs applied, carryover resolution rate).
+
+**5. Automation (02.validation/automation.md):** Create `automation.md` following `references/automation-template.md`. Review **all** iterations' `01.train/execute/` directories — not just the current one — and reflect on three questions: (1) Which steps were tedious or repetitive? (2) What made them tedious — boilerplate, manual data transforms, repeated file operations? (3) How could a Python script automate them? Prioritize automating steps that recur across iterations, since those compound the time cost. Automation candidates should be persisted as scripts in `execute/` and promoted into the skill's `scripts/` directory when they prove stable.
 
 ### Stage 4: Output (`03.output/`)
 
