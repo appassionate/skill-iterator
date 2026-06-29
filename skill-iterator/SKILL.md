@@ -1,5 +1,5 @@
 ---
-name: iter-skill
+name: skill-iterator
 description: >-
   Iteratively improve an existing skill to make it more generalized, robust, and reusable.
   Triggers via `iter_skill({skill_name})` or when the user says: "iterate skill",
@@ -13,7 +13,7 @@ description: >-
 version: 3.8.0
 ---
 
-# iter_skill
+# skill-iterator
 
 A meta-skill for iteratively improving existing skills through a structured training
 pipeline. A skill's value is measured by how well it generalizes beyond the examples it was
