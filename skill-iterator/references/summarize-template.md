@@ -5,6 +5,11 @@ during training, (2) review of current iteration's todo items and their outcomes
 (3) structured carryover source for the next iteration's todo.md. The carryover sections
 use the same table format as todo.md so items can be directly copied.
 
+**Generation order:** summarize.md is generated **after** the three Phase A validation
+artifacts (generalization.md, benchmark.md, automation.md) are complete. This allows the
+walkthrough and Validation Generated sections to incorporate findings from the full
+validation analysis — producing a more complete and accurate carryover list.
+
 ```markdown
 # Summarize: iter.XXXX
 

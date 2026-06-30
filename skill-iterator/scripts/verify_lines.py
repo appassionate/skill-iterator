@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """verify_lines.py — Line count verification for iter_skill pipeline.
 
-Counts lines in a skill directory and compares against a previous iteration.
-Outputs a delta table for changelog.md / benchmark.md.
+Counts lines in target_skill/ and optionally compares against a previous
+git state. Outputs a delta table for changelog.md / benchmark.md.
 
 Usage:
-    python verify_lines.py --current <path_to_skill_dir> [--previous <path_to_prev_skill_dir>]
-    python verify_lines.py --current iter.0007/01.train/skill --previous iter.0006/03.output
+    python verify_lines.py --current target_skill
+    python verify_lines.py --current target_skill --previous target_skill
 """
 
 import argparse
@@ -15,7 +15,7 @@ from pathlib import Path
 
 
 def count_lines(directory: Path) -> dict[str, int]:
-    """Count lines in SKILL.md and all references/*.md files."""
+    """Count lines in SKILL.md, references/*.md, and scripts/*.py files."""
     counts = {}
     skill_md = directory / "SKILL.md"
     if skill_md.exists():
@@ -25,6 +25,11 @@ def count_lines(directory: Path) -> dict[str, int]:
     if refs_dir.exists():
         for f in sorted(refs_dir.glob("*.md")):
             counts[f"references/{f.name}"] = sum(1 for _ in f.open())
+
+    scripts_dir = directory / "scripts"
+    if scripts_dir.exists():
+        for f in sorted(scripts_dir.glob("*.py")):
+            counts[f"scripts/{f.name}"] = sum(1 for _ in f.open())
 
     counts["Total"] = sum(v for k, v in counts.items() if k != "Total")
     return counts
@@ -88,19 +93,19 @@ def verify(current_dir: Path, previous_dir: Path | None = None) -> None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Verify line counts in a skill directory."
+        description="Verify line counts in target_skill/ directory."
     )
     parser.add_argument(
         "--current",
         type=Path,
         required=True,
-        help="Path to current skill directory",
+        help="Path to current skill directory (e.g., target_skill)",
     )
     parser.add_argument(
         "--previous",
         type=Path,
         default=None,
-        help="Path to previous skill directory (for delta comparison)",
+        help="Path to previous skill state (for delta comparison)",
     )
 
     args = parser.parse_args()
