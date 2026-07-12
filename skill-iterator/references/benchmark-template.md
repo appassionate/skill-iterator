@@ -16,6 +16,10 @@ previously part of changelog.md, giving them a dedicated home for cross-iteratio
 | Efficiency (SKILL.md)   | [N] lines     | [N] lines     | [±]    |
 | Efficiency (default ctx)| [N] lines     | [N] lines     | [±]    |
 
+> **Default context** = total lines loaded into the model's context at session start:
+> SKILL.md + any reference templates that are auto-loaded (not loaded on-demand).
+> This metric tracks the "always-on" instruction footprint.
+
 ## Assessment Snapshot
 
 | Dimension       | Rating    | Key Issue |
@@ -36,7 +40,7 @@ Ratings: **strong** / **adequate** / **weak** / **missing**.
 | New generalized strategies identified | [N] | From generalization.md |
 | Strategies applied in this iteration  | [N] | How many were acted upon |
 | Carryover items resolved              | [N/M] | Resolved vs total from previous iter |
-| New carryover items generated         | [N] | From Validation Generated section |
+| New carryover items generated         | [N] | From after section Items table (validation items) |
 ```
 
 For iter.0001, mark "Previous" as N/A (baseline). Subsequent iterations compare against

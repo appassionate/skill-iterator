@@ -1,61 +1,135 @@
 # todo.md Template
 
-Each iteration's `todo.md` has two table sections. Content sourcing differs by section:
-**User Requirements** preserves the user's original input text verbatim (their language,
-phrasing, and wording); **Validation Generated** uses formatted, standardized descriptions
-in English. Both sections share the same table structure. Status values: `done`, `plan`,
-`pending`, `deferred`, `dropped`.
+Each iteration's `todo.md` has up to four sections:
 
-- `done` — completed in a prior or current iteration.
-- `plan` — targeted for improvement in the current iteration.
-- `pending` — not yet addressed, carried from a previous iteration.
-- `deferred` — intentionally postponed with a reason.
-- `dropped` — no longer relevant.
+- **start** — requirements and original prompt (Stage 1)
+- **end** — walkthrough, friction, and unified items review (Stage 4)
+- **validation - system** — auto-generated validation items with priority (Stage 4)
+- **validation - user** — user-added requirements with priority, editable in HTML (Stage 4)
 
-## Section 1: User Requirements
+Table columns (by section):
+
+| Section | Columns |
+|---------|---------|
+| start | #, Source, Priority, Content |
+| end (items) | #, Source, Priority, Status, Content |
+| validation - system | #, Source, Priority, Content |
+| validation - user | #, Priority, Content |
+
+Priority values: `high`, `medium`, `low`.
+Status values (end section only): `done`, `plan`, `pending`, `deferred`, `dropped`.
+Source values: `user` (from user's request), `system` (auto-generated from validation).
+
+**Priority inheritance:** Start items derive their priority from the corresponding
+validation section item that generated them. User-prompt items get priority from
+the user's own analysis of importance.
+
+## Section: start
+
+Filled in at Stage 1 (Prepare). Contains the **original prompt** (verbatim user input) as a
+description block, plus an **items table** with decomposed, actionable items.
+
+**Prompt block:** The full original user request, preserved verbatim. Marked with
+`**Original Prompt:**`.
+
+**Items table:** The prompt is decomposed into small, executable items. Each row includes
+a **Priority** column indicating importance. `user` items contain the decomposed task
+description. `system` items carry over from previous iterations.
 
 ```markdown
-## User Requirements
+# Todo: iter.XXXX
 
-| # | Status | Content | Added in |
-|---|--------|---------|----------|
-| U1 | done/plan/pending/deferred/dropped | [user's original input text, verbatim] | iter.XXXX |
-| U2 | ... | ... | ... |
+## start
+
+**Original Prompt:**
+
+[Full original user request text, verbatim]
+
+| # | Source | Priority | Content |
+|---|--------|----------|---------|
+| 1 | user   | high     | [decomposed task from prompt] |
+| 2 | system | medium   | [carryover from prior iter] |
 ```
 
-Quote the user's original input text in the Content column — preserve their exact language,
-phrasing, and wording. If the user wrote in Chinese, keep Chinese; if English, keep English.
-Do not paraphrase, abstract, or translate. For iter.0001, these come directly from the user's
-invocation prompt. For iter.0002+, carry forward all prior items (resolved and unresolved)
-and append new requirements. Items targeted for the current iteration are marked `plan`.
+## Section: end
 
-## Section 2: Validation Generated
+Filled in at Stage 4 (Summarize). Contains the iteration's walkthrough, friction analysis,
+and a unified items table.
 
 ```markdown
-## Validation Generated (from iter.XXXX-1 summarize)
+## end
 
-| # | Status | Content | Added in |
-|---|--------|---------|----------|
-| V1 | done/plan/pending/deferred/dropped | [formatted, standardized description] | iter.XXXX |
-| V2 | ... | ... | ... |
+### Walkthrough Summary
+
+One paragraph overview of how the skill performed against rawdata.
+
+### Friction and Resolution
+
+| # | Rawdata Item | Difficulty Encountered | Root Cause | How It Was Resolved |
+|---|-------------|----------------------|------------|--------------------|
+| 1 | [item]      | [what went wrong]    | [why]      | [workaround used]  |
+
+### Items
+
+Single unified table with both Priority and Status columns:
+
+| # | Source | Priority | Status | Content |
+|---|--------|----------|--------|---------|
+| 1 | user   | high     | done   | [start item, status updated to final] |
+| 2 | system | medium   | pending | [new item discovered during iteration] |
 ```
 
-Unlike User Requirements, Validation Generated items use **formatted descriptions** —
-standardized English phrasing that distills the original observation into an actionable,
-cross-iteration reference. This distinction matters: user requirements preserve intent
-through exact wording; validation items are the model's own distilled findings, and
-standardized formatting makes them easier to track, merge, and resolve across iterations.
+## Section: validation - system
 
-For iter.0001, mark the section header "N/A — first iteration" with an empty table. For
-iter.0002+, copy the carryover items from the previous iteration's **summarize.md**
-(both the "This Iteration Review" and "Validation Generated" sections, which use the same
-table structure) and from **generalization.md** (where applicable strategies were identified).
-Reference todo.md throughout: during training (stay focused), validation (check each item),
-and output (confirm completeness).
+Auto-generated validation items discovered during the iteration. Each has a **Priority**
+column (`high` / `medium` / `low`). In the HTML viewer, priority is editable via dropdown.
+
+Both validation sections have a **Render** button that opens a dismissible modal dialog
+showing all validation items formatted as a concise, LLM-friendly prompt text.
+
+```markdown
+## validation - system
+
+| # | Source | Priority | Content |
+|---|--------|----------|---------|
+| 1 | system | high     | [actionable improvement] |
+| 2 | system | medium   | [another improvement] |
+```
+
+## Section: validation - user
+
+User-added requirements with editable priority. This section is **interactive in HTML**:
+users can add items, edit content and priority inline, and delete items.
+
+```markdown
+## validation - user
+
+| # | Priority | Content |
+|---|----------|---------|
+| 1 | high     | [user-defined requirement] |
+```
+
+## HTML and JSON Output
+
+After writing or updating todo.md, generate two output files:
+`python generate_todo_html.py --input todo.md --output todo.html`.
+
+| File | Purpose | Contains data? |
+|------|---------|---------------|
+| `todo.html` | Self-contained HTML with embedded data | Yes — data embedded inline |
+| `data_todo.json` | Structured data for tooling | Yes — same data as pure JSON |
+
+The script embeds the JSON data directly into the HTML template
+(replacing the `__TODO_DATA__` placeholder).
+
+**Render feature:** Both validation sections have a **Render** button. Clicking it opens
+a dismissible modal dialog (Tailwind styled) showing all validation items (system + user)
+formatted as a concise, LLM-friendly prompt text, sorted by priority. The modal includes
+a **Copy** button for clipboard export. Close via the X button, Close button, backdrop click,
+or Escape key.
 
 ## Mixed-Language Iterations
 
-When the user communicates in a non-English language, the two sections naturally diverge:
-User Requirements appears in the user's language, Validation Generated in English. This is
-by design, not an inconsistency to fix. The divergence reflects the provenance distinction —
-each section preserves the voice of its source.
+When the user communicates in a non-English language, the prompt block preserves the
+original language verbatim. Task table items may appear in the user's language (for `user`
+source) or English (for `system` source). This is by design.

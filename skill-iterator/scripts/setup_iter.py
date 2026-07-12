@@ -8,7 +8,6 @@ copy — no per-iteration skill copies are created.
 Usage:
     python setup_iter.py --base <workspace_path> --iter <N>
     python setup_iter.py --base . --iter 7
-    python setup_iter.py --base /path/to/iter_skill(target)/ --iter 3 --skill-name my-skill
 """
 
 import argparse
@@ -16,26 +15,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-
-def count_lines(directory: Path) -> dict[str, int]:
-    """Count lines in SKILL.md, references/*.md, and scripts/*.py files."""
-    counts = {}
-    skill_md = directory / "SKILL.md"
-    if skill_md.exists():
-        counts["SKILL.md"] = sum(1 for _ in skill_md.open())
-
-    refs_dir = directory / "references"
-    if refs_dir.exists():
-        for f in sorted(refs_dir.glob("*.md")):
-            counts[f"references/{f.name}"] = sum(1 for _ in f.open())
-
-    scripts_dir = directory / "scripts"
-    if scripts_dir.exists():
-        for f in sorted(scripts_dir.glob("*.py")):
-            counts[f"scripts/{f.name}"] = sum(1 for _ in f.open())
-
-    counts["Total"] = sum(v for k, v in counts.items() if k != "Total")
-    return counts
+from _common import count_lines
 
 
 def ensure_git(target_skill: Path) -> None:
@@ -76,7 +56,7 @@ def create_branch(target_skill: Path, branch_name: str) -> None:
     print(f"  Created branch: {branch_name}")
 
 
-def setup_iteration(base: Path, iter_num: int, skill_name: str | None = None) -> None:
+def setup_iteration(base: Path, iter_num: int) -> None:
     """Create iteration directory structure and set up git branch."""
     iter_dir = base / f"iter.{iter_num:04d}"
     branch_name = f"iter.{iter_num:04d}"
@@ -132,12 +112,6 @@ def main():
         required=True,
         help="Iteration number (e.g., 7 for iter.0007)",
     )
-    parser.add_argument(
-        "--skill-name",
-        type=str,
-        default=None,
-        help="Skill name (reserved for future use; target_skill/ is the source)",
-    )
 
     args = parser.parse_args()
 
@@ -145,7 +119,7 @@ def main():
         print(f"Error: Base directory {args.base} does not exist.")
         sys.exit(1)
 
-    setup_iteration(args.base.resolve(), args.iter, args.skill_name)
+    setup_iteration(args.base.resolve(), args.iter)
 
 
 if __name__ == "__main__":

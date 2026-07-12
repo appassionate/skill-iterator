@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skill Iteration Overview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
+    code, .mono { font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; }
+    .nav-link { display: block; padding: 6px 12px; border-radius: 6px; font-size: 13px; color: #64748b; transition: all 0.15s; }
+    .nav-link:hover { background: #f1f5f9; color: #334155; }
+    .nav-link.active { background: #1e293b; color: #fff; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .donut-segment { transition: opacity 0.2s; }
+    .donut-segment:hover { opacity: 0.8; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+  <!-- Header -->
+  <header class="bg-slate-900 text-white px-6 py-4 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+      <div>
+        <h1 class="text-lg font-bold" id="header-title">Skill Iteration Overview</h1>
+        <p class="text-slate-400 text-xs mt-0.5" id="header-description"></p>
+      </div>
+      <div class="flex gap-5 text-sm" id="header-stats"></div>
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto flex">
+
+    <!-- Sidebar -->
+    <nav class="w-56 shrink-0 sticky top-[60px] h-[calc(100vh-60px)] overflow-y-auto border-r border-slate-200 bg-white p-3 space-y-1" id="sidebar">
+      <a href="#overview" class="nav-link active" data-panel="panel-overview" onclick="switchPanel(this)">Overview</a>
+      <div class="pt-3 pb-1 px-3">
+        <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Iterations</span>
+      </div>
+      <div id="nav-iters"></div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-6 space-y-6 min-w-0">
+
+      <!-- Overview Panel -->
+      <div class="panel active" id="panel-overview">
+        <h2 class="text-lg font-bold text-slate-800 mb-4">Overview</h2>
+
+        <!-- Skill Info Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" id="skill-info-grid"></div>
+
+        <!-- Status Distribution Across Iterations -->
+        <div class="border border-slate-200 rounded-lg overflow-hidden mb-6" id="section-status-chart">
+          <div class="bg-slate-50 border-b border-slate-200 px-4 py-2.5">
+            <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Status Distribution</span>
+          </div>
+          <div class="p-4" id="status-chart-container"></div>
+        </div>
+
+        <!-- File Tree -->
+        <div class="border border-slate-200 rounded-lg overflow-hidden mb-6" id="section-file-tree">
+          <div class="bg-slate-50 border-b border-slate-200 px-4 py-2.5">
+            <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">File Structure</span>
+          </div>
+          <div class="p-4" id="file-tree-container"></div>
+        </div>
+
+        <!-- Scripts -->
+        <div class="border border-slate-200 rounded-lg overflow-hidden mb-6 hidden" id="section-scripts">
+          <div class="bg-slate-50 border-b border-slate-200 px-4 py-2.5">
+            <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Scripts</span>
+          </div>
+          <div class="p-4" id="scripts-list"></div>
+        </div>
+
+        <!-- Assets -->
+        <div class="border border-slate-200 rounded-lg overflow-hidden hidden" id="section-assets">
+          <div class="bg-slate-50 border-b border-slate-200 px-4 py-2.5">
+            <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Assets / Templates</span>
+          </div>
+          <div class="p-4" id="assets-list"></div>
+        </div>
+      </div>
+
+      <!-- Iteration Panels (dynamically generated) -->
+      <div id="iter-panels"></div>
+
+    </main>
+  </div>
+
+  <script id="overview-data">
+  const OVERVIEW_DATA = __OVERVIEW_DATA__;
+  </script>
+  <script>
+
+    const PRIORITY_STYLES = {
+      high:   'bg-red-50 text-red-700 border-red-200',
+      medium: 'bg-amber-50 text-amber-700 border-amber-200',
+      low:    'bg-slate-100 text-slate-600 border-slate-200',
+    };
+
+    const STATUS_STYLES = {
+      done:     'bg-emerald-50 text-emerald-700 border-emerald-200',
+      plan:     'bg-blue-50 text-blue-700 border-blue-200',
+      pending:  'bg-amber-50 text-amber-700 border-amber-200',
+      deferred: 'bg-slate-100 text-slate-500 border-slate-200',
+      dropped:  'bg-red-50 text-red-600 border-red-200',
+    };
+
+    const STATUS_COLORS = {
+      done:     '#10b981',
+      plan:     '#3b82f6',
+      pending:  '#f59e0b',
+      deferred: '#94a3b8',
+      dropped:  '#ef4444',
+    };
+
+    const SOURCE_STYLES = {
+      user:   'bg-indigo-50 text-indigo-700 border-indigo-200',
+      system: 'bg-violet-50 text-violet-700 border-violet-200',
+    };
+
+    function badge(text, styleMap, key) {
+      const cls = styleMap[key] || 'bg-slate-50 text-slate-600 border-slate-200';
+      return `<span class="inline-block text-xs font-medium px-2 py-0.5 rounded border ${cls}">${esc(text)}</span>`;
+    }
+
+    function esc(text) {
+      const d = document.createElement('div');
+      d.textContent = text || '';
+      return d.innerHTML;
+    }
+
+    function fmtContent(text) {
+      let s = esc(text);
+      s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+      s = s.replace(/`(.+?)`/g, '<code class="bg-slate-100 px-1 py-0.5 rounded text-xs">$1</code>');
+      return s;
+    }
+
+    function switchPanel(el) {
+      document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      el.classList.add('active');
+      const panelId = el.getAttribute('data-panel');
+      const panel = document.getElementById(panelId);
+      if (panel) panel.classList.add('active');
+    }
+
+    // --- Donut Chart ---
+    function donutChart(statusCounts, size) {
+      size = size || 120;
+      const total = Object.values(statusCounts).reduce((s, v) => s + v, 0);
+      if (total === 0) return '<p class="text-xs text-slate-400 italic">No data</p>';
+      const r = size / 2 - 10;
+      const cx = size / 2, cy = size / 2;
+      const circumference = 2 * Math.PI * r;
+      let offset = 0;
+      let segments = '';
+      let legend = '';
+
+      const statuses = ['done', 'plan', 'pending', 'deferred', 'dropped'];
+      statuses.forEach(status => {
+        const count = statusCounts[status] || 0;
+        if (count === 0) return;
+        const pct = count / total;
+        const dash = circumference * pct;
+        const color = STATUS_COLORS[status] || '#94a3b8';
+        segments += `<circle class="donut-segment" cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="16" stroke-dasharray="${dash} ${circumference - dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"/>`;
+        offset += dash;
+        legend += `<div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background:${color}"></span><span class="text-xs text-slate-600">${status}</span><span class="mono text-xs text-slate-400">${count}</span></div>`;
+      });
+
+      return `<div class="flex items-center gap-6">
+        <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${segments}
+          <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" class="text-lg font-bold" fill="#334155">${total}</text>
+        </svg>
+        <div class="space-y-1.5">${legend}</div>
+      </div>`;
+    }
+
+    // --- Stacked Bar Chart for all iterations ---
+    function stackedBarChart(iters) {
+      const statuses = ['done', 'plan', 'pending', 'deferred', 'dropped'];
+      let rows = '';
+      iters.forEach(iter => {
+        const endSection = iter.end || iter.after || {};
+        const startSection = iter.start || iter.begin || {};
+        const endItems = endSection.items || [];
+        const startItems = startSection.items || [];
+        const items = endItems.length > 0 ? endItems : startItems;
+        const total = items.length;
+        if (total === 0) return;
+
+        const counts = {};
+        statuses.forEach(s => counts[s] = items.filter(i => (i.status || (endItems.length === 0 ? 'pending' : '')).replace(/.*/, () => i.status || (endItems.length === 0 ? '' : '')) === s).length);
+        // Recount properly
+        statuses.forEach(s => counts[s] = 0);
+        items.forEach(item => {
+          const st = item.status || '';
+          if (counts[st] !== undefined) counts[st]++;
+        });
+        if (endItems.length === 0) counts.pending = total; // in-progress iter
+
+        let barSegments = '';
+        statuses.forEach(s => {
+          if (counts[s] === 0) return;
+          const w = (counts[s] / total) * 100;
+          barSegments += `<div class="h-5" style="width:${w}%;background:${STATUS_COLORS[s]}" title="${s}: ${counts[s]}"></div>`;
+        });
+
+        rows += `<div class="flex items-center gap-3">
+          <span class="mono text-xs text-slate-500 w-20 shrink-0">${esc(iter.iteration)}</span>
+          <div class="flex flex-1 rounded overflow-hidden bg-slate-100">${barSegments}</div>
+          <span class="mono text-xs text-slate-400 w-10 text-right">${total}</span>
+        </div>`;
+      });
+
+      if (!rows) return '';
+
+      let legendHtml = '<div class="flex gap-4 mt-3">';
+      statuses.forEach(s => {
+        legendHtml += `<div class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded" style="background:${STATUS_COLORS[s]}"></span><span class="text-xs text-slate-500">${s}</span></div>`;
+      });
+      legendHtml += '</div>';
+
+      return `<div class="space-y-2">${rows}</div>${legendHtml}`;
+    }
+
+    // --- Render Overview Panel ---
+    function renderOverview(data) {
+      const skill = data.skill || {};
+
+      // Header
+      document.title = `Overview: ${skill.name || 'Unknown'}`;
+      document.getElementById('header-title').textContent = `Overview: ${skill.name || 'Unknown'}`;
+      document.getElementById('header-description').textContent = skill.description || '';
+
+      const iters = data.iterations || [];
+      const totalItems = iters.reduce((sum, it) => {
+        const end = ((it.end || it.after) && (it.end || it.after).items) || [];
+        const start = ((it.start || it.begin) && (it.start || it.begin).items) || [];
+        return sum + (end.length || start.length);
+      }, 0);
+      const totalDone = iters.reduce((sum, it) => {
+        const end = ((it.end || it.after) && (it.end || it.after).items) || [];
+        return sum + end.filter(i => i.status === 'done').length;
+      }, 0);
+
+      document.getElementById('header-stats').innerHTML = `
+        <div class="text-center"><span class="mono font-bold text-white block">${iters.length}</span><span class="text-[10px] text-slate-400 uppercase">iters</span></div>
+        <div class="text-center"><span class="mono font-bold text-white block">${totalDone}/${totalItems}</span><span class="text-[10px] text-slate-400 uppercase">done</span></div>
+        <div class="text-center"><span class="mono font-bold text-white block">${skill.skill_lines || '-'}</span><span class="text-[10px] text-slate-400 uppercase">lines</span></div>
+      `;
+
+      // Skill info cards
+      let gridHtml = '';
+      gridHtml += `<div class="bg-white border border-slate-200 rounded-lg p-3"><p class="text-[10px] font-semibold text-slate-400 uppercase mb-1">Name</p><p class="text-sm font-medium text-slate-800">${esc(skill.name || 'N/A')}</p></div>`;
+      gridHtml += `<div class="bg-white border border-slate-200 rounded-lg p-3"><p class="text-[10px] font-semibold text-slate-400 uppercase mb-1">SKILL.md</p><p class="text-sm mono font-medium text-slate-800">${skill.skill_lines || 'N/A'} lines</p></div>`;
+      gridHtml += `<div class="bg-white border border-slate-200 rounded-lg p-3"><p class="text-[10px] font-semibold text-slate-400 uppercase mb-1">Description</p><p class="text-xs text-slate-600 leading-relaxed">${esc(skill.description || 'N/A')}</p></div>`;
+      document.getElementById('skill-info-grid').innerHTML = gridHtml;
+
+      // Status distribution chart
+      document.getElementById('status-chart-container').innerHTML = stackedBarChart(iters);
+
+      // File tree
+      if (skill.file_tree) {
+        document.getElementById('file-tree-container').innerHTML = `<pre class="text-xs text-slate-600 leading-relaxed bg-slate-50 rounded-lg p-3 overflow-x-auto">${esc(skill.file_tree)}</pre>`;
+      }
+
+      // Scripts
+      const scripts = data.scripts || [];
+      if (scripts.length > 0) {
+        document.getElementById('section-scripts').classList.remove('hidden');
+        let h = '<div class="space-y-2">';
+        scripts.forEach(s => {
+          h += `<div class="flex items-center gap-3 text-sm"><code class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-700">${esc(s.name)}</code><span class="mono text-xs text-slate-400">${s.lines} lines</span>`;
+          if (s.description) h += `<span class="text-xs text-slate-500">${esc(s.description)}</span>`;
+          h += `</div>`;
+        });
+        h += '</div>';
+        document.getElementById('scripts-list').innerHTML = h;
+      }
+
+      // Assets
+      const assets = data.assets || [];
+      if (assets.length > 0) {
+        document.getElementById('section-assets').classList.remove('hidden');
+        let h = '<div class="space-y-2">';
+        assets.forEach(a => {
+          h += `<div class="flex items-center gap-3 text-sm"><code class="bg-slate-100 px-2 py-0.5 rounded text-xs text-slate-700">${esc(a.name)}</code><span class="mono text-xs text-slate-400">${a.lines} lines</span>`;
+          if (a.type) h += badge(a.type, { html: 'bg-blue-50 text-blue-700 border-blue-200', md: 'bg-slate-100 text-slate-600 border-slate-200' }, a.type);
+          h += `</div>`;
+        });
+        h += '</div>';
+        document.getElementById('assets-list').innerHTML = h;
+      }
+    }
+
+    // --- Render Iteration Panels ---
+    function renderIterPanels(iters) {
+      const navContainer = document.getElementById('nav-iters');
+      const panelsContainer = document.getElementById('iter-panels');
+      let navHtml = '', panelsHtml = '';
+
+      iters.forEach(iter => {
+        const id = iter.iteration;
+        const startSection = iter.start || iter.begin || {};
+        const endSection = iter.end || iter.after || {};
+        const startItems = startSection.items || [];
+        const endItems = endSection.items || [];
+        const done = endItems.filter(i => i.status === 'done').length;
+        const total = endItems.length || startItems.length;
+        const hasEnd = endItems.length > 0;
+
+        // Nav link
+        const statusDot = !hasEnd ? 'bg-amber-400' : (done === total ? 'bg-emerald-400' : 'bg-blue-400');
+        navHtml += `<a href="#${id}" class="nav-link flex items-center gap-2" data-panel="panel-${id}" onclick="switchPanel(this)">
+          <span class="w-1.5 h-1.5 rounded-full ${statusDot}"></span>${esc(id)}
+        </a>`;
+
+        // Panel
+        panelsHtml += `<div class="panel" id="panel-${id}">`;
+        panelsHtml += `<h2 class="text-lg font-bold text-slate-800 mb-4">${esc(id)}</h2>`;
+
+        if (iter.generated_at) {
+          panelsHtml += `<p class="text-xs text-slate-400 mono mb-4">${esc(iter.generated_at)}</p>`;
+        }
+
+        // Prompt
+        if (startSection.prompt) {
+          panelsHtml += `<div class="border border-slate-200 rounded-lg overflow-hidden mb-4">
+            <div class="bg-slate-50 border-b border-slate-200 px-4 py-2"><span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Original Prompt</span></div>
+            <div class="p-4"><p class="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">${esc(startSection.prompt)}</p></div>
+          </div>`;
+        }
+
+        // Stats row with donut
+        const statusCounts = {};
+        if (hasEnd) {
+          endItems.forEach(i => { const s = i.status || ''; statusCounts[s] = (statusCounts[s] || 0) + 1; });
+        }
+        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+        panelsHtml += `<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">`;
+        panelsHtml += `<div class="bg-white border border-slate-200 rounded-lg p-4 flex items-center gap-4">`;
+        if (hasEnd) {
+          panelsHtml += donutChart(statusCounts, 100);
+        } else {
+          panelsHtml += `<div class="text-center w-full"><span class="text-xs text-amber-600 italic">In progress</span><br><span class="mono text-2xl font-bold text-slate-700">${total}</span><span class="text-xs text-slate-400 ml-1">items</span></div>`;
+        }
+        panelsHtml += `</div>`;
+
+        panelsHtml += `<div class="bg-white border border-slate-200 rounded-lg p-4">
+          <p class="text-[10px] font-semibold text-slate-400 uppercase mb-2">Completion</p>
+          <p class="mono text-2xl font-bold ${pct === 100 ? 'text-emerald-600' : 'text-slate-700'}">${done}/${total}</p>
+          <div class="w-full bg-slate-200 rounded-full h-2 mt-2"><div class="${pct === 100 ? 'bg-emerald-500' : pct >= 60 ? 'bg-blue-500' : 'bg-amber-500'} h-2 rounded-full" style="width:${pct}%"></div></div>
+        </div>`;
+
+        const sysCount = startItems.filter(i => i.source === 'system').length;
+        const usrCount = startItems.filter(i => i.source === 'user').length;
+        panelsHtml += `<div class="bg-white border border-slate-200 rounded-lg p-4">
+          <p class="text-[10px] font-semibold text-slate-400 uppercase mb-2">Sources</p>
+          <div class="space-y-1.5">
+            <div class="flex items-center gap-2">${badge('user', SOURCE_STYLES, 'user')}<span class="mono text-sm text-slate-700">${usrCount}</span></div>
+            <div class="flex items-center gap-2">${badge('system', SOURCE_STYLES, 'system')}<span class="mono text-sm text-slate-700">${sysCount}</span></div>
+          </div>
+        </div>`;
+        panelsHtml += `</div>`;
+
+        // Start items
+        if (startItems.length > 0) {
+          panelsHtml += `<div class="border border-slate-200 rounded-lg overflow-hidden mb-4">
+            <div class="bg-slate-50 border-b border-slate-200 px-4 py-2"><span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Start — Items</span></div>
+            <div class="p-4 space-y-1.5">`;
+          startItems.forEach(item => {
+            const endItem = endItems.find(e => String(e.id) === String(item.id));
+            const status = endItem ? endItem.status : '';
+            panelsHtml += `<div class="flex items-start gap-2 text-xs py-1">`;
+            panelsHtml += `<span class="mono text-slate-400 shrink-0 w-5">${esc(String(item.id))}</span>`;
+            panelsHtml += badge(item.source, SOURCE_STYLES, item.source);
+            if (item.priority) panelsHtml += badge(item.priority, PRIORITY_STYLES, item.priority);
+            panelsHtml += `<span class="text-slate-700 flex-1">${fmtContent(item.content)}</span>`;
+            if (status) panelsHtml += badge(status, STATUS_STYLES, status);
+            panelsHtml += `</div>`;
+          });
+          panelsHtml += `</div></div>`;
+        }
+
+        // Friction
+        const friction = (endSection.friction || []);
+        if (friction.length > 0) {
+          panelsHtml += `<div class="border border-slate-200 rounded-lg overflow-hidden mb-4">
+            <div class="bg-slate-50 border-b border-slate-200 px-4 py-2"><span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Friction & Resolution</span></div>
+            <div class="p-4 space-y-3">`;
+          friction.forEach((f, i) => {
+            panelsHtml += `<div class="text-xs"><p class="font-medium text-slate-700">${i + 1}. ${fmtContent(f.item)}</p>
+              <p class="text-slate-500 mt-0.5"><strong>Difficulty:</strong> ${fmtContent(f.difficulty)} · <strong>Root cause:</strong> ${fmtContent(f.root_cause)} · <strong>Resolution:</strong> ${fmtContent(f.resolution)}</p></div>`;
+          });
+          panelsHtml += `</div></div>`;
+        }
+
+        // Walkthrough
+        if (endSection.walkthrough) {
+          panelsHtml += `<div class="border border-slate-200 rounded-lg overflow-hidden mb-4">
+            <div class="bg-slate-50 border-b border-slate-200 px-4 py-2"><span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Walkthrough</span></div>
+            <div class="p-4"><p class="text-sm text-slate-700 leading-relaxed">${esc(endSection.walkthrough)}</p></div>
+          </div>`;
+        }
+
+        // Validation sections
+        const valSys = (iter.validation_system && iter.validation_system.items) || [];
+        const valUsr = (iter.validation_user && iter.validation_user.items) || [];
+        if (valSys.length > 0 || valUsr.length > 0) {
+          panelsHtml += `<div class="border border-slate-200 rounded-lg overflow-hidden">
+            <div class="bg-slate-50 border-b border-slate-200 px-4 py-2"><span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Validation</span></div>
+            <div class="p-4 space-y-3">`;
+          if (valSys.length > 0) {
+            panelsHtml += `<div><p class="text-[10px] font-semibold text-violet-500 uppercase mb-1.5">System</p>`;
+            valSys.forEach(item => {
+              panelsHtml += `<div class="flex items-start gap-2 text-xs py-1">
+                <span class="mono text-slate-400 shrink-0 w-5">${esc(String(item.id))}</span>
+                ${item.priority ? badge(item.priority, PRIORITY_STYLES, item.priority) : ''}
+                <span class="text-slate-700 flex-1">${fmtContent(item.content)}</span>
+              </div>`;
+            });
+            panelsHtml += `</div>`;
+          }
+          if (valUsr.length > 0) {
+            panelsHtml += `<div><p class="text-[10px] font-semibold text-indigo-500 uppercase mb-1.5">User</p>`;
+            valUsr.forEach(item => {
+              panelsHtml += `<div class="flex items-start gap-2 text-xs py-1">
+                <span class="mono text-slate-400 shrink-0 w-5">${esc(String(item.id))}</span>
+                ${item.priority ? badge(item.priority, PRIORITY_STYLES, item.priority) : ''}
+                <span class="text-slate-700 flex-1">${fmtContent(item.content)}</span>
+              </div>`;
+            });
+            panelsHtml += `</div>`;
+          }
+          panelsHtml += `</div></div>`;
+        }
+
+        panelsHtml += `</div>`;
+      });
+
+      navContainer.innerHTML = navHtml;
+      panelsContainer.innerHTML = panelsHtml;
+    }
+
+    function render() {
+      const data = typeof OVERVIEW_DATA !== 'undefined' ? OVERVIEW_DATA : null;
+      if (!data) {
+        document.getElementById('header-description').textContent = 'No overview data embedded.';
+        return;
+      }
+      renderOverview(data);
+      renderIterPanels(data.iterations || []);
+    }
+
+    render();
+  </script>
+</body>
+</html>

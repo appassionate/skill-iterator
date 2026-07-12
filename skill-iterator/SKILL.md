@@ -53,7 +53,17 @@ Once located, read every file in the skill directory — SKILL.md plus all bundl
 
 ### Step 2: Parse User Input
 
-- **Rawdata** (input archive): `rawdata/` is the comprehensive archive of **all input files** for the iteration — test prompts, sample data, and every file the user uploads or that participates in exercise execution. Collect all files at workspace setup; completeness ensures every iteration is fully reproducible. Missing inputs make it impossible to verify earlier results or build on them in later rounds. **Archive files that participate in `execute/` execution even if `target_skill/` does not directly reference them** — configuration files, helper data, lookup tables, sample datasets, or reference documents that inform how exercises run. These indirect inputs are often invisible to the skill's instructions but critical to reproducing the exercise and are the most commonly overlooked archive candidates. The directory is shared read-only across iterations for consistent comparison. If no files are provided, generate 3-5 synthetic test cases: 2 happy-path, 2 edge cases, 1 error case, covering the skill's domain.
+- **Rawdata** (input archive): `rawdata/` is the comprehensive archive of **all input files**
+  for the iteration — test prompts, sample data, and every file the user uploads or that
+  participates in exercise execution. Collect all files at workspace setup; completeness
+  ensures every iteration is fully reproducible. The directory is shared read-only across
+  iterations for consistent comparison.
+  - **Indirect inputs:** Archive files that participate in `execute/` execution even if
+    `target_skill/` does not directly reference them — configuration files, helper data,
+    lookup tables, sample datasets, or reference documents that inform how exercises run.
+    These are the most commonly overlooked archive candidates.
+  - **No files provided:** Generate 3-5 synthetic test cases: 2 happy-path, 2 edge cases,
+    1 error case, covering the skill's domain.
 - **Requirements**: explicit improvement goals. If none, default to self-evaluation mode.
 - **Iteration count**: default 3, adjustable.
 
@@ -62,6 +72,18 @@ Once located, read every file in the skill directory — SKILL.md plus all bundl
 Before creating the workspace, confirm: target skill (name + path + file manifest), rawdata
 plan, iteration goal, and iteration count.
 
+### Step 4: Create or Locate the Workspace
+
+**Initial iteration (iter.0001):**  This directory is the main workspace — it will contain
+`rawdata/`, `target_skill/`, iteration directories, and the final zip.
+
+**Continuing iteration (iter.0002+):** The user must specify the path to the existing
+`iter_skill({target_skill_name})/` workspace. If the path is not provided, search for it
+using `Glob("**/iter_skill({target_skill_name})/SKILL.md")` and confirm with the user.
+Never create a new workspace for a continuing iteration — always resume in the existing one
+so that `target_skill/` (with its git history) and prior `iter.XXXX/` directories are
+preserved.
+
 **Self-reference note:** When iterating on iter_skill itself, `target_skill/` at the workspace root is the working copy. All changes go into `target_skill/`, never the currently executing instructions at `{SKILLS_LOCATION}/skills/skill-iterator/`. Self-iteration optimizes the SKILL.md text and reference files only — do not recursively exercise the training pipeline against itself. The skill tells the model how to run iterations; iterating on it means improving those instructions, not running the pipeline on the pipeline.
 
 ---
@@ -69,16 +91,19 @@ plan, iteration goal, and iteration count.
 ## Workspace Structure
 
 ```
-iter_skill({target_skill_name})/
+iter_skill({target_skill_name})/    # Always create a new workspace directory named as mentioned, or continue from user specified
 ├── rawdata/                        # Input archive — all files that participate in iteration
 │   └── (test cases, sample data, config files)
 ├── target_skill/                   # Complete target skill — the single working copy (git-managed)
 │   ├── .git/                       # Git repository — one branch per iteration (iter.XXXX)
 │   ├── SKILL.md
+│   ├── assets/                     # Static templates (todo_template.html, overview_template.html)
 │   ├── references/
 │   └── scripts/
 ├── iter.0001/
-│   ├── todo.md                     # Iteration contract (see references/todo-template.md)
+│   ├── todo.md                     # Iteration record: start (requirements) + end (review) sections
+│   ├── todo.html                   # Self-contained HTML with embedded data (see HTML/JSON Output)
+│   ├── data_todo.json              # Structured JSON data (source of truth for tooling)
 │   ├── 01.train/
 │   │   └── execute/                # Target skill's execution workspace — outputs, logs, and friction notes
 │   ├── 02.validation/
@@ -86,24 +111,36 @@ iter_skill({target_skill_name})/
 │   │   ├── benchmark.md            # Assessment snapshot + performance metrics
 │   │   └── automation.md           # Tedium analysis + automation opportunities
 │   └── 03.summarize/
-│       ├── summarize.md            # Walkthrough + todo review + carryover (see references/summarize-template.md)
 │       └── changelog.md            # Git diff summary + reasoning (see references/changelog-template.md)
 ├── iter.0002/                      # (same structure; target_skill/ persists across iterations)
 ├── iter.NNNN/
+├── overview.html                   # Iteration overview with sidebar nav, charts, file tree (auto-generated)
 └── {target_skill_name}.zip         # Latest packaged snapshot of target_skill/ (excludes .git/)
 ```
 
-### Key Rules
+### Key Procedure Rules
 
 - **target_skill/ is the single working copy.** Created once at workspace setup with the full target skill content (SKILL.md + all bundled files), it lives at the workspace root and persists across all iterations. Every iteration reads from and writes improvements to this same directory. There is no per-iteration skill copy.
 - **Git tracks every iteration.** `target_skill/` is a git repository. Each iteration creates a branch named `iter.XXXX` (matching the iteration directory name). All improvements are committed on that branch. When starting an iteration, create the branch from the current HEAD; if a branch with the same name already exists, delete it first (`git branch -D iter.XXXX`). This provides full history, diff, and rollback capability across iterations.
-- **rawdata/ is the input archive.** Collect all user-uploaded files, test prompts, and reference materials at workspace setup. `rawdata/` archives every file that participates in the iteration — not just files the target skill directly references, but also those consumed during `execute/` (configuration files, helper data, lookup tables, sample datasets). These indirect inputs are the most commonly overlooked archive candidates. Completeness ensures any iteration can be fully reproduced. The directory is shared read-only across all rounds to ensure consistent comparison.
+- **rawdata/ is the input archive.** Collect all files at workspace setup (see Step 2 for what to include). Shared read-only across all iterations.
 - **todo.md drives the iteration.** Created first, referenced throughout, verified at the end.
-- **Validation produces three artifacts in `02.validation/`.** generalization.md captures what was learned, benchmark.md captures how well the skill performs, and automation.md captures what should be mechanized. These artifacts feed Stage 4 (Summarize) — do not skip or rush validation, because the summarize step depends on their analysis.
-- **`execute/` is the target skill's execution workspace.** It is where the target skill *actively performs its tasks* — generating outputs, running scripts, encountering friction. Self-correction artifacts produced during exercise (workarounds, improved scripts, refined logic) may originate in `execute/` but should ultimately be considered for promotion to `target_skill/` as optimizations to the skill itself. When reviewing `execute/` during validation, look for process artifacts (logs, intermediate states, workarounds) not just final outputs.
-- **Script the scaffolding.** The workspace setup pattern (create directories, initialize target_skill/ with git, verify line counts) repeats identically in every iteration. When running 3+ iterations, create a Python script (e.g., `setup_iter.py`) in `01.train/execute/` to automate it. This eliminates the single most repetitive step in the pipeline and prevents drift between iterations.
+- **`01.train/execute/` is the target skill's execution workspace** (see Stage 2 for what to record there). Look for process artifacts (logs, workarounds) during validation, not just final outputs.
+- **`02.validation/` produces three artifacts in validation.** (see Stage 3 for details). Do not skip or rush — Stage 4 depends on their analysis.
+- **Script the scaffolding.** The workspace setup pattern (create directories, initialize target_skill/ with git, verify line counts) repeats identically in every iteration. When running 3+ iterations, create Python scripts (e.g., `setup_iter.py` for workspace setup, `verify_lines.py` for line count verification) in `01.train/execute/` to automate it. This eliminates the single most repetitive step in the pipeline and prevents drift between iterations.
 - **Scripts must track SKILL.md in the same iteration.** When structural changes are made to the workspace model (directory layout, file paths, git workflow), audit all bundled scripts in `target_skill/scripts/` during the same iteration. Scripts that implement the old architecture while SKILL.md describes the new one create a silent alignment gap — the documentation says one thing, the automation does another. Promote updated scripts to `target_skill/scripts/` alongside the SKILL.md changes they implement.
-- **Package after each iteration.** At the end of Stage 5 (Finalize), create a zip archive: `zip -r {target_skill_name}.zip target_skill/ -x "target_skill/.git/*"`. Store at the workspace root. The zip always reflects the latest iteration — same filename, overwritten each round. This provides a portable snapshot for installation or distribution without requiring git access.
+- **Package after each iteration.** At the end of Stage 5 (Finalize), run `python package_skill.py --target target_skill/ --output {target_skill_name}.zip` from the workspace root. The zip always reflects the latest iteration — same filename, overwritten each round.
+
+---
+
+## Localization
+
+**Think in English, output in the target skill's language.** During iteration, always reason
+and think in English to preserve analytical precision — unless the user explicitly requests
+otherwise. All output artifacts (validation reports, todo.md, changelog.md, and the
+improved SKILL.md) use the same language as the target skill's SKILL.md. This applies to
+both the skill content itself and all iteration-generated content. The user may override the
+output language by explicitly requesting a different one. Workspace file names (todo.md,
+summarize.md, etc.) always remain in English for cross-iteration consistency.
 
 ---
 
@@ -113,17 +150,35 @@ Each iteration follows: **Prepare → Train → Validate → Summarize → Final
 
 ### Stage 1: Prepare (`todo.md`)
 
-Create `todo.md` following `references/todo-template.md`. Two sections, each as a table
-with columns: **#** (sequential ID), **Status** (`done` / `plan` / `pending` / `deferred` / `dropped`),
-**Content** (see sourcing rules below), **Added in** (which iteration introduced the item).
-Use `plan` for items targeted for improvement in the current iteration.
+Create `todo.md` following `references/todo-template.md`. The file has up to four sections:
+`start` (this stage), `end`, `validation - system`, and `validation - user` (Stage 4).
 
-1. **User Requirements** — quote the user's original input text verbatim (preserve their language, phrasing, and wording). If the user wrote in Chinese, the Content column contains Chinese; if English, English. For iter.0002+, carry forward all prior items and append new ones.
-2. **Validation Generated** — carryover items from the previous iteration's summarize.md (both "This Iteration Review" unresolved items and "Validation Generated" entries). These use formatted, standardized descriptions (not raw quotes) since they represent distilled, cross-iteration knowledge. Mark "N/A" for iter.0001.
+**Section "start"** — filled in at this stage. Contains two parts:
+
+1. **Prompt block** — the user's original request, preserved verbatim under `**Original Prompt:**`. This captures the full input context without cluttering the items table.
+
+2. **Items table** — the prompt decomposed into small, actionable items. Columns:
+   **#** (sequential ID, plain numbers), **Source** (`user` or `system`), **Priority** (`high` / `medium` / `low`), **Content** (decomposed task description).
+   The original prompt text does NOT appear in the table — only decomposed items do.
+
+**Priority inheritance:** Start items that carry over from prior iterations inherit the priority assigned in the previous `validation - system` section. Items derived from the user's prompt get priority based on the user's own analysis of importance.
+
+**Section "end"** — left as a placeholder at this stage. Filled in at Stage 4.
+
+**Content sourcing by source type:**
+- `user` — decomposed, actionable task descriptions derived from the user's original prompt. Each row is one concrete step, not a verbatim quote. If the user wrote in Chinese, item descriptions are in Chinese.
+- `system` — carryover items from the previous iteration's `validation - system` section. Use formatted, standardized descriptions. Mark N/A for iter.0001.
+
+**HTML and JSON output:** After writing todo.md, generate two output files: `python generate_todo_html.py --input todo.md --output todo.html`. The script parses todo.md, embeds the JSON data directly into the HTML template, and writes `data_todo.json` for programmatic access. Each `todo.html` is fully self-contained. Regenerate both files whenever todo.md is updated.
+
+**Carryover management:** To prevent todo.md from growing unbounded across iterations:
+- Each iteration should target at most 5-7 items. Prioritize by impact on the six assessment dimensions.
+- Items carried over for 3+ consecutive iterations without being addressed should be re-evaluated: either include them in the current iteration, defer with a reason, or drop if no longer relevant.
+- Total carryover items should not exceed 15. If approaching this limit, consolidate related items or drop low-priority ones.
 
 ### Stage 2: Train (`01.train/`)
 
-**Seed:** `target_skill/` is already at the workspace root — no copying needed. Create the iteration's git branch: `git checkout -b iter.XXXX` (delete first with `git branch -D iter.XXXX` if it already exists). All subsequent improvements to `target_skill/` are committed on this branch.
+**Seed:** Create the iteration's git branch as described in Key Rules. `target_skill/` is already at the workspace root — no copying needed.
 
 **Exercise:** Apply the skill against every rawdata item. This means *fully executing* the
 target skill's tasks — actually performing every step the skill describes, not just
@@ -161,7 +216,7 @@ generalization.md with concrete, verifiable patterns rather than abstract assess
 **Assess and Improve:** This is a three-step checkpoint within Stage 2 — exercise first,
 evaluate second, promote third. All three must complete before moving to Stage 3 (Validate).
 
-1. **Exercise:** Run the target skill against every rawdata item. Record all outputs, friction logs, failure notes, and workarounds into `execute/`.
+1. **Exercise:** Perform the exercise described above (apply the skill against every rawdata item, record outputs and friction into `execute/`).
 2. **Evaluate:** Re-read everything in `execute/` — generated outputs, friction logs, failure notes, workarounds, and persisted scripts. Assess the exercise results against the Assessment Framework (below) and todo.md items, scoring each of the six dimensions. Identify which friction points trace to skill instructions (gaps, ambiguities, wrong assumptions) versus environmental factors (missing dependencies, data issues). This evaluation is the bridge between raw exercise data and actionable improvements.
 3. **Promote to target_skill/:** Apply improvements directly to `target_skill/` based on the evaluation findings. Each change should trace back to a specific observation from execute/ — if you cannot point to the evidence that motivated a change, reconsider whether it is needed. Commit the improvements on the current iteration branch.
 
@@ -189,13 +244,37 @@ Stage 3 produces three artifacts in `02.validation/`:
 
 **3. Automation (02.validation/automation.md):** Create `automation.md` following `references/automation-template.md`. Review **all** iterations' `execute/` directories — not just the current one — and reflect on three questions: (1) Which steps were tedious or repetitive? (2) What made them tedious? (3) How could a Python script automate them? Prioritize automating steps that recur across iterations. Automation candidates should be promoted into `target_skill/scripts/` when they prove stable.
 
-### Stage 4: Summarize (`03.summarize/`)
+### Stage 4: Summarize (`todo.md "end"` + `03.summarize/`)
 
-This stage synthesizes the validation results into cross-iteration records. It depends on Stage 3 being complete — summarize.md and changelog.md are summaries of the validation analysis.
+This stage synthesizes validation results. It depends on Stage 3 being complete.
 
-**1. Walkthrough (03.summarize/summarize.md):** Re-read every file in `execute/` **and all validation artifacts**. Create `summarize.md` following `references/summarize-template.md`. Contains: the friction-and-resolution table, a **This Iteration Review** section (closing the loop for items marked `plan` in todo.md), and a **Validation Generated** section formatted identically to todo.md. The Validation Generated section is the direct carryover source for the next iteration's todo.md.
+**1. Fill in todo.md "end" section and validation sections:** Re-read every file in `execute/` **and all validation artifacts**. Update `todo.md` (following `references/todo-template.md`) with:
 
-**2. Changelog (03.summarize/changelog.md):** Create `changelog.md` following `references/changelog-template.md`. Collects the `git diff` output from `target_skill/` for the current iteration branch, then adds a **Why** column explaining the reasoning behind each change. The git diff provides an authoritative, complete record of what changed; the "Why" column captures the design decisions for traceability. Run: `git diff main..iter.XXXX` (or `git log --oneline main..iter.XXXX` for commit-level summary) inside `target_skill/` to gather the diff data.
+**End section:**
+- **Walkthrough Summary** — one paragraph overview of how the skill performed against rawdata.
+- **Friction and Resolution Table** — each row traces a real difficulty to its root cause and resolution.
+- **Items Table** — a single unified table (columns: #, Source, Priority, Status, Content):
+  - All start items with their final status (`done`, `plan`, `pending`, `deferred`, `dropped`).
+  - Start items keep their original # and priority.
+
+**Validation - system section:**
+- Auto-generated validation items discovered during the iteration (columns: #, Source, Priority, Content).
+- All items use Source = `system`. IDs use plain sequential numbers (1, 2, 3...).
+- **Priority** column: `high` (blocks next iteration), `medium` (should address soon), `low` (nice to have).
+- These become the carryover source for the next iteration's start section.
+
+**Validation - user section:**
+- Optional. User-added requirements that emerge during iteration review or user feedback.
+- Columns: #, Priority, Content. IDs use plain sequential numbers (1, 2, 3...).
+- In the HTML viewer, this section supports interactive editing (add, edit priority, edit content, delete).
+
+Both validation sections have a **Render** button that opens a dismissible modal dialog showing
+all validation items (system + user) formatted as a concise, LLM-friendly prompt text, sorted by
+priority. The modal includes a **Copy** button for clipboard export.
+
+After updating todo.md, regenerate both output files: `python generate_todo_html.py --input todo.md --output todo.html`. This writes `data_todo.json` and embeds data into `todo.html`.
+
+**2. Changelog (03.summarize/changelog.md):** Create `changelog.md` following `references/changelog-template.md`. Collects the `git diff` output from `target_skill/` for the current iteration branch, then adds a **Why** column explaining the reasoning behind each change. Run: `git diff main..iter.XXXX` inside `target_skill/` to gather the diff data.
 
 ### Stage 5: Finalize
 
@@ -208,7 +287,8 @@ The improved skill is already in `target_skill/` from Stage 2 — there is no se
 5. Verify all bundled files are present and consistent (no orphaned references).
 6. Confirm todo.md completeness — every item done or explicitly deferred.
 7. Commit the final state on the iteration branch (`git add -A && git commit`).
-8. **Package target_skill/** as a zip archive: `zip -r {target_skill_name}.zip target_skill/ -x "target_skill/.git/*"`. Store at the workspace root. The filename is always `{target_skill_name}.zip` — same name each iteration, always reflecting the latest version.
+8. **Generate overview:** Run `python generate_overview.py --workspace . --output overview.html` from the workspace root. This fully automated script scans all iter.XXXX directories, collects start/end data from each `data_todo.json`, builds a file tree of `target_skill/`, lists scripts and assets, and produces a self-contained `overview.html` with a sidebar navigation bar (Overview + per-iteration panels), status distribution charts (SVG donut per iteration, stacked bar across all iterations), file structure tree, and detailed iteration views including items, friction, walkthrough, and validation data.
+9. **Package target_skill/** by running `python package_skill.py --target target_skill/ --output {target_skill_name}.zip` from the workspace root.
 
 **Alternate outcomes:** If the assessment concluded the skill should be split rather than iterated, the output is a decomposition plan (identifying split boundaries and proposed new skills) instead of an improved single skill.
 
@@ -250,16 +330,23 @@ Do major instructions explain *why* they matter? Could the model derive correct 
 
 **Self-Evaluation Mode:** No explicit complaint. Run through the Assessment Framework, identify highest-impact issues, address them. Prioritize silent failures (plausible but wrong output) over loud failures (model asks for clarification).
 
+**Mode selection rules:**
+- If the user provides specific failure reports, error examples, or explicit improvement goals → **User-Driven Mode**. Focus on the reported issues first.
+- If the user says "iterate", "improve", or "review" without specifics, or if Step 2 parsed no explicit requirements → **Self-Evaluation Mode**. Run the full Assessment Framework.
+- Mixed signals (user gives one example but also says "make it better overall") → Start in User-Driven Mode for the specific issue, then switch to Self-Evaluation Mode for remaining gaps.
+
 ---
 
 ## Iteration Cadence and Stopping
 
-A good rhythm: iter.0001 fixes obvious gaps (highest ROI), iter.0002-0003 runs deep exercises and addresses structural issues, iter.0004+ polishes and trims. Don't iterate for the sake of it — if all dimensions are adequate or strong and summarize.md reports no remaining friction, say so and stop. A shipped skill is worth more than a perfect one still being tweaked.
+A good rhythm: iter.0001 fixes obvious gaps (highest ROI), iter.0002-0003 runs deep exercises and addresses structural issues, iter.0004+ polishes and trims. Don't iterate for the sake of it — a shipped skill is worth more than a perfect one still being tweaked.
+
+**Stopping criteria** — stop iterating when **all** of the following are true:
+1. All six Assessment Framework dimensions are rated `adequate` or `strong` for two consecutive iterations.
+2. Friction count in the latest iteration is 0 (no unresolved difficulties during exercise).
+3. No carryover items remain unaddressed — all items from prior iterations have been resolved, deferred, or dropped.
+4. Rawdata pass rate is 100% with no regressions from the previous iteration.
+
+If these conditions are met, say so explicitly and recommend stopping. If the user requests more iterations despite meeting all criteria, note this in todo.md and scope to a single new concern.
 
 **Proportionality:** For trivially simple skills (<50 lines), consider a lighter process — skip the full workspace ceremony and do a focused assessment + improvement pass. For extremely complex skills (>500 lines), scope the iteration to one concern at a time or address the Kitchen Sink risk first.
-
----
-
-## Localization
-
-**Think in English, output in the target skill's language.** During iteration, always reason and think in English to preserve analytical precision — unless the user explicitly requests otherwise. All output artifacts (validation reports, summarize.md, changelog.md, and the improved SKILL.md) use the same language as the target skill's SKILL.md. This applies to both the skill content itself and all iteration-generated content. The user may override the output language by explicitly requesting a different one. Workspace file names (todo.md, summarize.md, etc.) always remain in English for cross-iteration consistency.

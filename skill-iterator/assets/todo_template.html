@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Todo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
+    code, .mono { font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; }
+  </style>
+</head>
+<body class="bg-white text-slate-800 min-h-screen">
+
+  <!-- Header -->
+  <header class="bg-slate-900 text-white px-6 py-4">
+    <div class="max-w-5xl mx-auto flex justify-between items-center">
+      <div>
+        <h1 class="text-xl font-bold" id="header-title">Todo</h1>
+        <p class="text-slate-400 text-sm mt-0.5" id="header-meta"></p>
+      </div>
+      <div class="text-right text-sm" id="header-stats"></div>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-6 py-6 space-y-6">
+
+    <!-- Start Section -->
+    <section class="border border-slate-200 rounded-lg overflow-hidden" id="section-start">
+      <div class="bg-slate-50 border-b border-slate-200 px-4 py-2.5">
+        <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Start — Requirements</span>
+      </div>
+      <div class="p-4 space-y-4">
+        <!-- Prompt display -->
+        <div id="start-prompt" class="hidden">
+          <h3 class="text-sm font-semibold text-slate-600 mb-1.5">Original Prompt</h3>
+          <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm leading-relaxed text-slate-700 whitespace-pre-wrap" id="prompt-text"></div>
+        </div>
+        <!-- Items table -->
+        <div>
+          <h3 class="text-sm font-semibold text-slate-600 mb-1.5">Items</h3>
+          <div class="overflow-x-auto" id="start-table"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- End Section -->
+    <section class="border border-slate-200 rounded-lg overflow-hidden hidden" id="section-end">
+      <div class="bg-slate-50 border-b border-slate-200 px-4 py-2.5">
+        <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">End — Review</span>
+      </div>
+      <div class="p-4 space-y-5">
+        <div id="end-walkthrough" class="hidden">
+          <h3 class="text-sm font-semibold text-slate-600 mb-1.5">Walkthrough Summary</h3>
+          <p class="text-sm leading-relaxed text-slate-700" id="walkthrough-text"></p>
+        </div>
+        <div id="end-friction" class="hidden">
+          <h3 class="text-sm font-semibold text-slate-600 mb-1.5">Friction and Resolution</h3>
+          <div class="overflow-x-auto" id="friction-table"></div>
+        </div>
+        <div id="end-items">
+          <h3 class="text-sm font-semibold text-slate-600 mb-1.5">Items</h3>
+          <div class="overflow-x-auto" id="items-table"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Validation System Section -->
+    <section class="border border-slate-200 rounded-lg overflow-hidden hidden" id="section-val-system">
+      <div class="bg-slate-50 border-b border-slate-200 px-4 py-2.5 flex justify-between items-center">
+        <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Validation — System</span>
+        <button onclick="renderPrompt()" class="text-xs bg-violet-600 text-white px-3 py-1 rounded hover:bg-violet-500 transition-colors">Render</button>
+      </div>
+      <div class="p-4">
+        <div class="overflow-x-auto" id="val-system-table"></div>
+      </div>
+    </section>
+
+    <!-- Validation User Section -->
+    <section class="border border-slate-200 rounded-lg overflow-hidden hidden" id="section-val-user">
+      <div class="bg-slate-50 border-b border-slate-200 px-4 py-2.5 flex justify-between items-center">
+        <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Validation — User</span>
+        <div class="flex gap-2">
+          <button onclick="addUserItem()" class="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-500 transition-colors">+ Add</button>
+          <button onclick="renderPrompt()" class="text-xs bg-violet-600 text-white px-3 py-1 rounded hover:bg-violet-500 transition-colors">Render</button>
+        </div>
+      </div>
+      <div class="p-4">
+        <div class="overflow-x-auto" id="val-user-table"></div>
+      </div>
+    </section>
+
+    <!-- Render Prompt Modal -->
+    <div id="render-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col">
+        <div class="flex justify-between items-center px-5 py-3 border-b border-slate-200">
+          <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wide">Validation Prompt</h2>
+          <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="px-5 py-4 overflow-y-auto flex-1">
+          <pre id="render-prompt-text" class="text-sm leading-relaxed text-slate-700 whitespace-pre-wrap font-sans"></pre>
+        </div>
+        <div class="px-5 py-3 border-t border-slate-200 flex justify-end gap-2">
+          <button onclick="copyPrompt()" class="text-xs bg-slate-800 text-white px-4 py-1.5 rounded hover:bg-slate-700 transition-colors">Copy</button>
+          <button onclick="closeModal()" class="text-xs bg-slate-200 text-slate-700 px-4 py-1.5 rounded hover:bg-slate-300 transition-colors">Close</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script id="todo-data">
+  const TODO_DATA = __TODO_DATA__;
+  </script>
+  <script>
+
+    const SOURCE_STYLES = {
+      user:   'bg-indigo-50 text-indigo-700 border-indigo-200',
+      system: 'bg-violet-50 text-violet-700 border-violet-200',
+    };
+
+    const STATUS_STYLES = {
+      done:     'bg-emerald-50 text-emerald-700 border-emerald-200',
+      plan:     'bg-blue-50 text-blue-700 border-blue-200',
+      pending:  'bg-amber-50 text-amber-700 border-amber-200',
+      deferred: 'bg-slate-100 text-slate-500 border-slate-200',
+      dropped:  'bg-red-50 text-red-600 border-red-200',
+    };
+
+    const PRIORITY_STYLES = {
+      high:   'bg-red-50 text-red-700 border-red-200',
+      medium: 'bg-amber-50 text-amber-700 border-amber-200',
+      low:    'bg-slate-100 text-slate-600 border-slate-200',
+    };
+
+    function badge(text, styleMap, key) {
+      const cls = styleMap[key] || 'bg-slate-50 text-slate-600 border-slate-200';
+      return `<span class="inline-block text-xs font-medium px-2 py-0.5 rounded border ${cls}">${esc(text)}</span>`;
+    }
+
+    function esc(text) {
+      const d = document.createElement('div');
+      d.textContent = text || '';
+      return d.innerHTML;
+    }
+
+    function fmtContent(text) {
+      let s = esc(text);
+      s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+      s = s.replace(/`(.+?)`/g, '<code class="bg-slate-100 px-1 py-0.5 rounded text-xs">$1</code>');
+      return s;
+    }
+
+    function thCell(text, w) {
+      const style = w ? ` style="width:${w}"` : '';
+      return `<th class="bg-slate-50 border border-slate-200 px-3 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide"${style}>${esc(text)}</th>`;
+    }
+
+    function tdCell(html, cls) {
+      return `<td class="border border-slate-200 px-3 py-2 align-top text-sm ${cls || ''}">${html}</td>`;
+    }
+
+    function deleteBtn(section, id) {
+      return `<button onclick="deleteItem('${section}', '${esc(String(id))}')" class="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded hover:bg-red-100 transition-colors">Delete</button>`;
+    }
+
+    function renderItemsTable(items, opts) {
+      opts = opts || {};
+      if (!items || items.length === 0) return '<p class="text-sm text-slate-400 italic">No items.</p>';
+      let h = '<table class="min-w-full text-sm border-collapse"><thead><tr>';
+      h += thCell('#', '50px');
+      if (opts.showSource !== false) h += thCell('Source', '100px');
+      if (opts.showPriority) h += thCell('Priority', '100px');
+      if (opts.showStatus) h += thCell('Status', '100px');
+      h += thCell('Content');
+      h += '</tr></thead><tbody>';
+      items.forEach(item => {
+        h += '<tr>';
+        h += tdCell(`<span class="mono text-xs text-slate-500">${esc(String(item.id))}</span>`);
+        if (opts.showSource !== false) h += tdCell(badge(item.source, SOURCE_STYLES, item.source));
+        if (opts.showPriority) h += tdCell(badge(item.priority || 'medium', PRIORITY_STYLES, item.priority || 'medium'));
+        if (opts.showStatus) h += tdCell(badge(item.status, STATUS_STYLES, item.status));
+        h += tdCell(fmtContent(item.content));
+        h += '</tr>';
+      });
+      h += '</tbody></table>';
+      return h;
+    }
+
+    function renderFrictionTable(friction) {
+      if (!friction || friction.length === 0) return '';
+      let h = '<table class="min-w-full text-sm border-collapse"><thead><tr>';
+      h += thCell('#', '50px') + thCell('Rawdata Item') + thCell('Difficulty') + thCell('Root Cause') + thCell('Resolution');
+      h += '</tr></thead><tbody>';
+      friction.forEach((f, i) => {
+        h += '<tr>';
+        h += tdCell(`<span class="mono text-xs text-slate-500">${i + 1}</span>`);
+        h += tdCell(fmtContent(f.item));
+        h += tdCell(fmtContent(f.difficulty));
+        h += tdCell(fmtContent(f.root_cause));
+        h += tdCell(fmtContent(f.resolution));
+        h += '</tr>';
+      });
+      h += '</tbody></table>';
+      return h;
+    }
+
+    function prioritySelect(section, idx, current) {
+      return `<select onchange="updatePriority('${section}', ${idx}, this.value)" class="text-xs border border-slate-300 rounded px-2 py-1 bg-white">` +
+        ['high','medium','low'].map(p =>
+          `<option value="${p}" ${current === p ? 'selected' : ''}>${p}</option>`
+        ).join('') + '</select>';
+    }
+
+    function renderValSystemTable(items) {
+      if (!items || items.length === 0) return '<p class="text-sm text-slate-400 italic">No system validation items.</p>';
+      let h = '<table class="min-w-full text-sm border-collapse"><thead><tr>';
+      h += thCell('#', '50px') + thCell('Priority', '120px') + thCell('Content') + thCell('Actions', '80px');
+      h += '</tr></thead><tbody>';
+      items.forEach((item, idx) => {
+        h += '<tr>';
+        h += tdCell(`<span class="mono text-xs text-slate-500">${esc(String(item.id))}</span>`);
+        h += tdCell(prioritySelect('validation_system', idx, item.priority || 'medium'));
+        h += tdCell(fmtContent(item.content));
+        h += tdCell(deleteBtn('validation_system', item.id));
+        h += '</tr>';
+      });
+      h += '</tbody></table>';
+      return h;
+    }
+
+    function renderValUserTable(items) {
+      let h = '<table class="min-w-full text-sm border-collapse"><thead><tr>';
+      h += thCell('#', '50px') + thCell('Priority', '120px') + thCell('Content') + thCell('Actions', '80px');
+      h += '</tr></thead><tbody>';
+      if (!items || items.length === 0) {
+        h += '<tr><td colspan="4" class="border border-slate-200 px-3 py-4 text-center text-sm text-slate-400 italic">No items. Click "+ Add" to create one.</td></tr>';
+      } else {
+        items.forEach((item, idx) => {
+          h += '<tr>';
+          h += tdCell(`<span class="mono text-xs text-slate-500">${esc(String(item.id))}</span>`);
+          h += tdCell(prioritySelect('validation_user', idx, item.priority || 'medium'));
+          h += `<td class="border border-slate-200 px-1 py-1 align-top"><textarea onchange="updateUserContent(${idx}, this.value)" class="w-full text-sm border-0 resize-y min-h-[36px] focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-2 py-1">${esc(item.content)}</textarea></td>`;
+          h += tdCell(deleteBtn('validation_user', item.id));
+          h += '</tr>';
+        });
+      }
+      h += '</tbody></table>';
+      return h;
+    }
+
+    // --- Interactive operations ---
+
+    function deleteItem(section, id) {
+      if (!TODO_DATA[section] || !TODO_DATA[section].items) return;
+      TODO_DATA[section].items = TODO_DATA[section].items.filter(i => String(i.id) !== String(id));
+      renderValidationSections();
+    }
+
+    function addUserItem() {
+      if (!TODO_DATA.validation_user) TODO_DATA.validation_user = { items: [] };
+      const maxId = TODO_DATA.validation_user.items.reduce((m, i) => {
+        const n = parseInt(String(i.id).replace(/\D/g, '')); return n > m ? n : m;
+      }, 0);
+      TODO_DATA.validation_user.items.push({ id: String(maxId + 1), priority: 'medium', content: '' });
+      renderValidationSections();
+      setTimeout(() => {
+        const tas = document.querySelectorAll('#val-user-table textarea');
+        if (tas.length > 0) tas[tas.length - 1].focus();
+      }, 50);
+    }
+
+    function updateUserContent(idx, value) {
+      if (TODO_DATA.validation_user && TODO_DATA.validation_user.items[idx]) {
+        TODO_DATA.validation_user.items[idx].content = value;
+      }
+    }
+
+    function updatePriority(section, idx, value) {
+      if (TODO_DATA[section] && TODO_DATA[section].items[idx]) {
+        TODO_DATA[section].items[idx].priority = value;
+      }
+    }
+
+    function renderPrompt() {
+      const sysItems = (TODO_DATA.validation_system && TODO_DATA.validation_system.items) || [];
+      const usrItems = (TODO_DATA.validation_user && TODO_DATA.validation_user.items) || [];
+
+      const priorityOrder = { high: 0, medium: 1, low: 2 };
+      const sortByPriority = (a, b) => (priorityOrder[a.priority] ?? 1) - (priorityOrder[b.priority] ?? 1);
+
+      let text = `# Carryover Validation Items — ${TODO_DATA.iteration || 'unknown'}\n\n`;
+
+      if (sysItems.length > 0) {
+        text += `## System-generated items\n\n`;
+        [...sysItems].sort(sortByPriority).forEach(item => {
+          text += `- [${item.priority || 'medium'}] ${item.content}\n`;
+        });
+        text += '\n';
+      }
+
+      if (usrItems.length > 0) {
+        text += `## User-defined items\n\n`;
+        [...usrItems].sort(sortByPriority).forEach(item => {
+          text += `- [${item.priority || 'medium'}] ${item.content}\n`;
+        });
+        text += '\n';
+      }
+
+      if (sysItems.length === 0 && usrItems.length === 0) {
+        text += 'No validation items to carry over.\n';
+      }
+
+      document.getElementById('render-prompt-text').textContent = text;
+      document.getElementById('render-modal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('render-modal').classList.add('hidden');
+    }
+
+    function copyPrompt() {
+      const text = document.getElementById('render-prompt-text').textContent;
+      navigator.clipboard.writeText(text).catch(() => {
+        // Fallback
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      });
+    }
+
+    // Close modal on backdrop click
+    document.addEventListener('click', function(e) {
+      if (e.target.id === 'render-modal') closeModal();
+    });
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeModal();
+    });
+
+    function renderValidationSections() {
+      const vsItems = TODO_DATA.validation_system ? TODO_DATA.validation_system.items || [] : [];
+      if (vsItems.length > 0) {
+        document.getElementById('section-val-system').classList.remove('hidden');
+        document.getElementById('val-system-table').innerHTML = renderValSystemTable(vsItems);
+      } else {
+        document.getElementById('section-val-system').classList.add('hidden');
+      }
+
+      if (TODO_DATA.validation_user) {
+        document.getElementById('section-val-user').classList.remove('hidden');
+        document.getElementById('val-user-table').innerHTML = renderValUserTable(TODO_DATA.validation_user.items || []);
+      }
+    }
+
+    function render() {
+      const data = typeof TODO_DATA !== 'undefined' ? TODO_DATA : null;
+      if (!data) {
+        document.getElementById('header-meta').textContent = 'No data embedded.';
+        document.getElementById('start-table').innerHTML =
+          '<div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">' +
+          '<strong>Data not loaded.</strong> Ensure todo data is embedded in this HTML file. ' +
+          'Generate it with: ' +
+          '<code class="bg-amber-100 px-1 rounded">python generate_todo_html.py --input todo.md --output todo.html</code>' +
+          '</div>';
+        return;
+      }
+
+      document.title = `Todo: ${data.iteration}`;
+      document.getElementById('header-title').textContent = `Todo: ${data.iteration}`;
+      document.getElementById('header-meta').textContent = data.generated_at
+        ? `Generated: ${data.generated_at}` : '';
+
+      const startItems = data.start ? data.start.items || [] : [];
+      const endItems = data.end ? data.end.items || [] : [];
+      const done = endItems.filter(i => i.status === 'done').length;
+      document.getElementById('header-stats').innerHTML =
+        `<span class="mono">${done}/${endItems.length || startItems.length}</span> items done`;
+
+      if (data.start && data.start.prompt) {
+        document.getElementById('start-prompt').classList.remove('hidden');
+        document.getElementById('prompt-text').textContent = data.start.prompt;
+      }
+
+      document.getElementById('start-table').innerHTML = renderItemsTable(startItems, { showPriority: true });
+
+      const end = data.end;
+      if (end) {
+        document.getElementById('section-end').classList.remove('hidden');
+        if (end.walkthrough) {
+          document.getElementById('end-walkthrough').classList.remove('hidden');
+          document.getElementById('walkthrough-text').textContent = end.walkthrough;
+        }
+        if (end.friction && end.friction.length > 0) {
+          document.getElementById('end-friction').classList.remove('hidden');
+          document.getElementById('friction-table').innerHTML = renderFrictionTable(end.friction);
+        }
+        if (endItems.length > 0) {
+          document.getElementById('items-table').innerHTML = renderItemsTable(endItems, { showPriority: true, showStatus: true });
+        } else {
+          document.getElementById('end-items').classList.add('hidden');
+        }
+      }
+
+      renderValidationSections();
+    }
+
+    render();
+  </script>
+</body>
+</html>

@@ -13,26 +13,7 @@ import argparse
 import sys
 from pathlib import Path
 
-
-def count_lines(directory: Path) -> dict[str, int]:
-    """Count lines in SKILL.md, references/*.md, and scripts/*.py files."""
-    counts = {}
-    skill_md = directory / "SKILL.md"
-    if skill_md.exists():
-        counts["SKILL.md"] = sum(1 for _ in skill_md.open())
-
-    refs_dir = directory / "references"
-    if refs_dir.exists():
-        for f in sorted(refs_dir.glob("*.md")):
-            counts[f"references/{f.name}"] = sum(1 for _ in f.open())
-
-    scripts_dir = directory / "scripts"
-    if scripts_dir.exists():
-        for f in sorted(scripts_dir.glob("*.py")):
-            counts[f"scripts/{f.name}"] = sum(1 for _ in f.open())
-
-    counts["Total"] = sum(v for k, v in counts.items() if k != "Total")
-    return counts
+from _common import count_lines
 
 
 def format_delta(current: int, previous: int | None) -> str:
