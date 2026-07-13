@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""generate_overview.py — Generate overview.html from iteration data.
+"""gen_overview.py — Generate overview.html from iteration data.
 
 Scans iter.XXXX directories, collects data_todo.json from each,
 reads SKILL.md for metadata, lists scripts and assets, then
 generates a self-contained overview.html with embedded data.
 
 Usage:
-    python generate_overview.py --workspace iter_skill(skill-iterator) --output overview.html
+    python gen_overview.py --workspace iter_skill(skill-iterator) --output overview.html
 """
 
 import argparse
@@ -143,9 +143,9 @@ def generate(workspace: Path, output_path: Path) -> None:
     # Find template
     template_path = _find_template(workspace)
     if not template_path:
-        print("Error: Could not find overview_template.html. Searched:")
-        print("  - target_skill/assets/overview_template.html")
-        print("  - assets/overview_template.html (relative to script)")
+        print("Error: Could not find overview.html. Searched:")
+        print("  - target_skill/assets/overview.html")
+        print("  - assets/overview.html (relative to script)")
         sys.exit(1)
 
     template = template_path.read_text(encoding="utf-8")
@@ -156,12 +156,12 @@ def generate(workspace: Path, output_path: Path) -> None:
 
 
 def _find_template(workspace: Path) -> Path | None:
-    """Locate overview_template.html."""
+    """Locate overview.html."""
     script_dir = Path(__file__).resolve().parent
     candidates = [
-        workspace / "target_skill" / "assets" / "overview_template.html",
-        script_dir.parent / "assets" / "overview_template.html",
-        script_dir / "assets" / "overview_template.html",
+        workspace / "target_skill" / "assets" / "overview.html",
+        script_dir.parent / "assets" / "overview.html",
+        script_dir / "assets" / "overview.html",
     ]
     for p in candidates:
         if p.exists():

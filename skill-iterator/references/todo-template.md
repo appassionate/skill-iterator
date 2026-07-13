@@ -1,23 +1,22 @@
 # todo.md Template
 
-Each iteration's `todo.md` has up to four sections:
+Each iteration's `todo.md` has up to three sections:
 
-- **start** — requirements and original prompt (Stage 1)
-- **end** — walkthrough, friction, and unified items review (Stage 4)
-- **validation - system** — auto-generated validation items with priority (Stage 4)
-- **validation - user** — user-added requirements with priority, editable in HTML (Stage 4)
+- **start** (REQUIREMENTS) — requirements and original prompt (Stage 1)
+- **end** (SOLUTIONS) — walkthrough, friction, and items with status + solution (Stage 4). Each solution item corresponds to a requirements item by # number (1:1).
+- **validation** — merged system-generated and user-defined validation items with priority (Stage 4)
 
 Table columns (by section):
 
 | Section | Columns |
 |---------|---------|
 | start | #, Source, Priority, Content |
-| end (items) | #, Source, Priority, Status, Content |
-| validation - system | #, Source, Priority, Content |
-| validation - user | #, Priority, Content |
+| end (items) | #, Status, Solution |
+| validation | #, Source, Priority, Content |
 
 Priority values: `high`, `medium`, `low`.
 Status values (end section only): `done`, `plan`, `pending`, `deferred`, `dropped`.
+Solution values (end section only): one sentence describing how the requirement was fulfilled.
 Source values: `user` (from user's request), `system` (auto-generated from validation).
 
 **Priority inheritance:** Start items derive their priority from the corresponding
@@ -71,48 +70,38 @@ One paragraph overview of how the skill performed against rawdata.
 
 ### Items
 
-Single unified table with both Priority and Status columns:
+SOLUTIONS table — each row corresponds to a REQUIREMENTS item by # number.
+Hover over # to see the full requirement text.
 
-| # | Source | Priority | Status | Content |
-|---|--------|----------|--------|---------|
-| 1 | user   | high     | done   | [start item, status updated to final] |
-| 2 | system | medium   | pending | [new item discovered during iteration] |
+| # | Status | Solution |
+|---|--------|----------|
+| 1 | done   | [one sentence: how this requirement was fulfilled] |
+| 2 | pending | [one sentence or —] |
+
+### Changelog
+
+Summarize `git diff iter.(XXXX-1)..iter.XXXX` from `target_skill/`:
+
+| File | Change | Why |
+|------|--------|-----|
+| [file path] | [brief description] | [reasoning] |
 ```
 
-## Section: validation - system
+## Section: validation
 
-Auto-generated validation items discovered during the iteration. Each has a **Priority**
-column (`high` / `medium` / `low`). In the HTML viewer, priority is editable via dropdown.
-
-Both validation sections have a **Render** button that opens a dismissible modal dialog
-showing all validation items formatted as a concise, LLM-friendly prompt text.
-
-```markdown
-## validation - system
+Single merged section combining system-generated and user-defined validation items.
+The Source column values are `system` (auto-generated) or `user` (user-added).
+Priority is `high` / `medium` / `low`.
 
 | # | Source | Priority | Content |
 |---|--------|----------|---------|
-| 1 | system | high     | [actionable improvement] |
-| 2 | system | medium   | [another improvement] |
-```
-
-## Section: validation - user
-
-User-added requirements with editable priority. This section is **interactive in HTML**:
-users can add items, edit content and priority inline, and delete items.
-
-```markdown
-## validation - user
-
-| # | Priority | Content |
-|---|----------|---------|
-| 1 | high     | [user-defined requirement] |
-```
+| 1 | system | medium   | [system-generated carryover item] |
+| 2 | user   | high     | [user-defined requirement] |
 
 ## HTML and JSON Output
 
 After writing or updating todo.md, generate two output files:
-`python generate_todo_html.py --input todo.md --output todo.html`.
+`python gen_todo.py --input todo.md --output todo.html`.
 
 | File | Purpose | Contains data? |
 |------|---------|---------------|
@@ -122,11 +111,13 @@ After writing or updating todo.md, generate two output files:
 The script embeds the JSON data directly into the HTML template
 (replacing the `__TODO_DATA__` placeholder).
 
-**Render feature:** Both validation sections have a **Render** button. Clicking it opens
-a dismissible modal dialog (Tailwind styled) showing all validation items (system + user)
-formatted as a concise, LLM-friendly prompt text, sorted by priority. The modal includes
-a **Copy** button for clipboard export. Close via the X button, Close button, backdrop click,
-or Escape key.
+**Validation buttons:** The validation section header includes three buttons (left to right):
+- **Reset** — restores validation items to their original state (as loaded from the initial embedded data).
+- **+ Add** — appends a new empty item for user input.
+- **Render** — opens a dismissible modal dialog showing all validation items formatted as a concise,
+LLM-friendly prompt text with field descriptions (e.g., `[priority: high] [source: system] content`),
+sorted by priority. The modal includes a **Copy** button for clipboard export.
+Close via the X button, Close button, backdrop click, or Escape key.
 
 ## Mixed-Language Iterations
 

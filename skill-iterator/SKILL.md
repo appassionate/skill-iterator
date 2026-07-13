@@ -97,21 +97,19 @@ iter_skill({target_skill_name})/    # Always create a new workspace directory na
 ├── target_skill/                   # Complete target skill — the single working copy (git-managed)
 │   ├── .git/                       # Git repository — one branch per iteration (iter.XXXX)
 │   ├── SKILL.md
-│   ├── assets/                     # Static templates (todo_template.html, overview_template.html)
+│   ├── assets/                     # Static templates (todo.html, overview.html)
 │   ├── references/
 │   └── scripts/
 ├── iter.0001/
-│   ├── todo.md                     # Iteration record: start (requirements) + end (review) sections
-│   ├── todo.html                   # Self-contained HTML with embedded data (see HTML/JSON Output)
+│   ├── todo.md                     # Iteration record: start (REQUIREMENTS) + end (SOLUTIONS) + validation sections
+│   ├── todo.html                   # Self-contained HTML with embedded data (includes changelog in end section)
 │   ├── data_todo.json              # Structured JSON data (source of truth for tooling)
 │   ├── 01.train/
 │   │   └── execute/                # Target skill's execution workspace — outputs, logs, and friction notes
-│   ├── 02.validation/
-│   │   ├── generalization.md       # Problem → solution → generalized strategy
-│   │   ├── benchmark.md            # Assessment snapshot + performance metrics
-│   │   └── automation.md           # Tedium analysis + automation opportunities
-│   └── 03.summarize/
-│       └── changelog.md            # Git diff summary + reasoning (see references/changelog-template.md)
+│   └── 02.validation/
+│       ├── generalization.md       # Problem → solution → generalized strategy
+│       ├── benchmark.md            # Assessment snapshot + performance metrics
+│       └── automation.md           # Tedium analysis + automation opportunities
 ├── iter.0002/                      # (same structure; target_skill/ persists across iterations)
 ├── iter.NNNN/
 ├── overview.html                   # Iteration overview with sidebar nav, charts, file tree (auto-generated)
@@ -126,9 +124,9 @@ iter_skill({target_skill_name})/    # Always create a new workspace directory na
 - **todo.md drives the iteration.** Created first, referenced throughout, verified at the end.
 - **`01.train/execute/` is the target skill's execution workspace** (see Stage 2 for what to record there). Look for process artifacts (logs, workarounds) during validation, not just final outputs.
 - **`02.validation/` produces three artifacts in validation.** (see Stage 3 for details). Do not skip or rush — Stage 4 depends on their analysis.
-- **Script the scaffolding.** The workspace setup pattern (create directories, initialize target_skill/ with git, verify line counts) repeats identically in every iteration. When running 3+ iterations, create Python scripts (e.g., `setup_iter.py` for workspace setup, `verify_lines.py` for line count verification) in `01.train/execute/` to automate it. This eliminates the single most repetitive step in the pipeline and prevents drift between iterations.
+- **Script the scaffolding.** The workspace setup pattern (create directories, initialize target_skill/ with git) repeats identically in every iteration. When running 3+ iterations, create Python scripts (e.g., `setup.py` for workspace setup) in `01.train/execute/` to automate it. This eliminates the single most repetitive step in the pipeline and prevents drift between iterations.
 - **Scripts must track SKILL.md in the same iteration.** When structural changes are made to the workspace model (directory layout, file paths, git workflow), audit all bundled scripts in `target_skill/scripts/` during the same iteration. Scripts that implement the old architecture while SKILL.md describes the new one create a silent alignment gap — the documentation says one thing, the automation does another. Promote updated scripts to `target_skill/scripts/` alongside the SKILL.md changes they implement.
-- **Package after each iteration.** At the end of Stage 5 (Finalize), run `python package_skill.py --target target_skill/ --output {target_skill_name}.zip` from the workspace root. The zip always reflects the latest iteration — same filename, overwritten each round.
+- **Package after each iteration.** At the end of Stage 5 (Finalize), run `python package.py --target target_skill/ --output {target_skill_name}.zip` from the workspace root. The zip always reflects the latest iteration — same filename, overwritten each round.
 
 ---
 
@@ -151,7 +149,7 @@ Each iteration follows: **Prepare → Train → Validate → Summarize → Final
 ### Stage 1: Prepare (`todo.md`)
 
 Create `todo.md` following `references/todo-template.md`. The file has up to four sections:
-`start` (this stage), `end`, `validation - system`, and `validation - user` (Stage 4).
+`start` (REQUIREMENTS, this stage), `end` (SOLUTIONS), and `validation` (Stage 4).
 
 **Section "start"** — filled in at this stage. Contains two parts:
 
@@ -169,7 +167,7 @@ Create `todo.md` following `references/todo-template.md`. The file has up to fou
 - `user` — decomposed, actionable task descriptions derived from the user's original prompt. Each row is one concrete step, not a verbatim quote. If the user wrote in Chinese, item descriptions are in Chinese.
 - `system` — carryover items from the previous iteration's `validation - system` section. Use formatted, standardized descriptions. Mark N/A for iter.0001.
 
-**HTML and JSON output:** After writing todo.md, generate two output files: `python generate_todo_html.py --input todo.md --output todo.html`. The script parses todo.md, embeds the JSON data directly into the HTML template, and writes `data_todo.json` for programmatic access. Each `todo.html` is fully self-contained. Regenerate both files whenever todo.md is updated.
+**HTML and JSON output:** After writing todo.md, generate two output files: `python gen_todo.py --input todo.md --output todo.html`. The script parses todo.md, embeds the JSON data directly into the HTML template, and writes `data_todo.json` for programmatic access. Each `todo.html` is fully self-contained. Regenerate both files whenever todo.md is updated.
 
 **Carryover management:** To prevent todo.md from growing unbounded across iterations:
 - Each iteration should target at most 5-7 items. Prioritize by impact on the six assessment dimensions.
@@ -244,37 +242,37 @@ Stage 3 produces three artifacts in `02.validation/`:
 
 **3. Automation (02.validation/automation.md):** Create `automation.md` following `references/automation-template.md`. Review **all** iterations' `execute/` directories — not just the current one — and reflect on three questions: (1) Which steps were tedious or repetitive? (2) What made them tedious? (3) How could a Python script automate them? Prioritize automating steps that recur across iterations. Automation candidates should be promoted into `target_skill/scripts/` when they prove stable.
 
-### Stage 4: Summarize (`todo.md "end"` + `03.summarize/`)
+### Stage 4: Summarize (`todo.md "end"`)
 
 This stage synthesizes validation results. It depends on Stage 3 being complete.
 
 **1. Fill in todo.md "end" section and validation sections:** Re-read every file in `execute/` **and all validation artifacts**. Update `todo.md` (following `references/todo-template.md`) with:
 
-**End section:**
+**End section (SOLUTIONS):**
 - **Walkthrough Summary** — one paragraph overview of how the skill performed against rawdata.
 - **Friction and Resolution Table** — each row traces a real difficulty to its root cause and resolution.
-- **Items Table** — a single unified table (columns: #, Source, Priority, Status, Content):
-  - All start items with their final status (`done`, `plan`, `pending`, `deferred`, `dropped`).
-  - Start items keep their original # and priority.
+- **Items Table** — SOLUTIONS table (columns: #, Status, Solution):
+  - Each solution item corresponds to a requirements item by matching # number (1:1 mapping).
+  - **#** column: same sequential ID as the matching requirement. Hovering shows a tooltip with the full requirement text (with Copy button).
+  - **Status** column: final status (`done`, `plan`, `pending`, `deferred`, `dropped`).
+  - **Solution** column: one sentence recording how the requirement was fulfilled.
 
-**Validation - system section:**
-- Auto-generated validation items discovered during the iteration (columns: #, Source, Priority, Content).
-- All items use Source = `system`. IDs use plain sequential numbers (1, 2, 3...).
-- **Priority** column: `high` (blocks next iteration), `medium` (should address soon), `low` (nice to have).
-- These become the carryover source for the next iteration's start section.
+**Validation section:**
+- A single merged section combining system-generated and user-defined validation items (columns: #, Source, Priority, Content).
+- **Source** column: `system` for auto-generated carryover items, `user` for user-added requirements.
+- **Priority** column: `high` (blocks next iteration), `medium` (should address soon), `low` (nice to have). In the HTML viewer, priority is editable via dropdown.
+- IDs use plain sequential numbers (1, 2, 3...).
+- System items become the carryover source for the next iteration's start section.
+- The section has a **Render** button that opens a dismissible modal dialog showing
+all validation items formatted as a concise, LLM-friendly prompt text with field descriptions
+(e.g., `[priority: high] [source: system] item content`), sorted by priority.
+The modal includes a **Copy** button for clipboard export.
+- A **Reset** button restores the validation items to their original state (as loaded from the initial data).
+- An **+ Add** button appends a new empty item for user input.
 
-**Validation - user section:**
-- Optional. User-added requirements that emerge during iteration review or user feedback.
-- Columns: #, Priority, Content. IDs use plain sequential numbers (1, 2, 3...).
-- In the HTML viewer, this section supports interactive editing (add, edit priority, edit content, delete).
+After updating todo.md, regenerate both output files: `python gen_todo.py --input todo.md --output todo.html`. This writes `data_todo.json` and embeds data into `todo.html`.
 
-Both validation sections have a **Render** button that opens a dismissible modal dialog showing
-all validation items (system + user) formatted as a concise, LLM-friendly prompt text, sorted by
-priority. The modal includes a **Copy** button for clipboard export.
-
-After updating todo.md, regenerate both output files: `python generate_todo_html.py --input todo.md --output todo.html`. This writes `data_todo.json` and embeds data into `todo.html`.
-
-**2. Changelog (03.summarize/changelog.md):** Create `changelog.md` following `references/changelog-template.md`. Collects the `git diff` output from `target_skill/` for the current iteration branch, then adds a **Why** column explaining the reasoning behind each change. Run: `git diff main..iter.XXXX` inside `target_skill/` to gather the diff data.
+**2. Changelog (integrated into end section):** As part of the end section in todo.md, include a **Changelog** subsection summarizing the `git diff` from `target_skill/` between the current iteration branch and the previous one. Run: `git diff iter.(XXXX-1)..iter.XXXX` inside `target_skill/` to gather the diff data. List each changed file with a brief description of the change and the reasoning behind it.
 
 ### Stage 5: Finalize
 
@@ -286,9 +284,10 @@ The improved skill is already in `target_skill/` from Stage 2 — there is no se
 4. Check for regressions — did generalization remove constraints important for common cases?
 5. Verify all bundled files are present and consistent (no orphaned references).
 6. Confirm todo.md completeness — every item done or explicitly deferred.
-7. Commit the final state on the iteration branch (`git add -A && git commit`).
-8. **Generate overview:** Run `python generate_overview.py --workspace . --output overview.html` from the workspace root. This fully automated script scans all iter.XXXX directories, collects start/end data from each `data_todo.json`, builds a file tree of `target_skill/`, lists scripts and assets, and produces a self-contained `overview.html` with a sidebar navigation bar (Overview + per-iteration panels), status distribution charts (SVG donut per iteration, stacked bar across all iterations), file structure tree, and detailed iteration views including items, friction, walkthrough, and validation data.
-9. **Package target_skill/** by running `python package_skill.py --target target_skill/ --output {target_skill_name}.zip` from the workspace root.
+7. **Git diff review:** Run `git diff iter.(XXXX-1)..iter.XXXX` inside `target_skill/` to review code changes compared to the previous iteration. Ensure all changes are intentional and well-documented.
+8. Commit the final state on the iteration branch (`git add -A && git commit`).
+9. **Generate overview:** Run `python gen_overview.py --workspace . --output overview.html` from the workspace root.
+10. **Package target_skill/** by running `python package.py --target target_skill/ --output {target_skill_name}.zip` from the workspace root.
 
 **Alternate outcomes:** If the assessment concluded the skill should be split rather than iterated, the output is a decomposition plan (identifying split boundaries and proposed new skills) instead of an improved single skill.
 

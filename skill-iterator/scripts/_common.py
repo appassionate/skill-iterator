@@ -2,7 +2,7 @@
 """_common.py — Shared utilities for iter_skill pipeline scripts.
 
 Provides reusable functions for line counting and file inspection.
-Imported by setup_iter.py and verify_lines.py to avoid code duplication.
+Imported by setup.py and verify.py to avoid code duplication.
 """
 
 from pathlib import Path

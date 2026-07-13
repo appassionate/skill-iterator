@@ -362,32 +362,47 @@
 
         const sysCount = startItems.filter(i => i.source === 'system').length;
         const usrCount = startItems.filter(i => i.source === 'user').length;
+        const srcTotal = usrCount + sysCount;
+        const usrPct = srcTotal > 0 ? Math.round((usrCount / srcTotal) * 100) : 0;
+        const sysPct = srcTotal > 0 ? 100 - usrPct : 0;
         panelsHtml += `<div class="bg-white border border-slate-200 rounded-lg p-4">
           <p class="text-[10px] font-semibold text-slate-400 uppercase mb-2">Sources</p>
-          <div class="space-y-1.5">
-            <div class="flex items-center gap-2">${badge('user', SOURCE_STYLES, 'user')}<span class="mono text-sm text-slate-700">${usrCount}</span></div>
-            <div class="flex items-center gap-2">${badge('system', SOURCE_STYLES, 'system')}<span class="mono text-sm text-slate-700">${sysCount}</span></div>
+          <div class="flex rounded overflow-hidden bg-slate-100 h-5 mb-2">
+            <div class="flex items-center justify-center text-[10px] font-medium text-white bg-indigo-500" style="width:${usrPct}%" title="user: ${usrCount}">${usrCount > 0 ? usrCount : ''}</div>
+            <div class="flex items-center justify-center text-[10px] font-medium text-white bg-violet-500" style="width:${sysPct}%" title="system: ${sysCount}">${sysCount > 0 ? sysCount : ''}</div>
+          </div>
+          <div class="flex gap-4 text-xs">
+            <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-indigo-500"></span><span class="text-slate-500">user ${usrCount}</span></div>
+            <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-violet-500"></span><span class="text-slate-500">system ${sysCount}</span></div>
           </div>
         </div>`;
         panelsHtml += `</div>`;
 
-        // Start items
+        // Start items — aligned table
         if (startItems.length > 0) {
           panelsHtml += `<div class="border border-slate-200 rounded-lg overflow-hidden mb-4">
             <div class="bg-slate-50 border-b border-slate-200 px-4 py-2"><span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Start — Items</span></div>
-            <div class="p-4 space-y-1.5">`;
+            <div class="p-4 overflow-x-auto">
+              <table class="min-w-full text-xs border-collapse">
+                <thead><tr>
+                  <th class="bg-slate-50 border border-slate-200 px-2 py-1.5 text-left font-semibold text-slate-500 uppercase w-8">#</th>
+                  <th class="bg-slate-50 border border-slate-200 px-2 py-1.5 text-left font-semibold text-slate-500 uppercase w-16">Source</th>
+                  <th class="bg-slate-50 border border-slate-200 px-2 py-1.5 text-left font-semibold text-slate-500 uppercase w-16">Priority</th>
+                  <th class="bg-slate-50 border border-slate-200 px-2 py-1.5 text-left font-semibold text-slate-500 uppercase">Content</th>
+                  ${hasEnd ? '<th class="bg-slate-50 border border-slate-200 px-2 py-1.5 text-left font-semibold text-slate-500 uppercase w-16">Status</th>' : ''}
+                </tr></thead><tbody>`;
           startItems.forEach(item => {
             const endItem = endItems.find(e => String(e.id) === String(item.id));
             const status = endItem ? endItem.status : '';
-            panelsHtml += `<div class="flex items-start gap-2 text-xs py-1">`;
-            panelsHtml += `<span class="mono text-slate-400 shrink-0 w-5">${esc(String(item.id))}</span>`;
-            panelsHtml += badge(item.source, SOURCE_STYLES, item.source);
-            if (item.priority) panelsHtml += badge(item.priority, PRIORITY_STYLES, item.priority);
-            panelsHtml += `<span class="text-slate-700 flex-1">${fmtContent(item.content)}</span>`;
-            if (status) panelsHtml += badge(status, STATUS_STYLES, status);
-            panelsHtml += `</div>`;
+            panelsHtml += `<tr>
+              <td class="border border-slate-200 px-2 py-1.5 mono text-slate-400">${esc(String(item.id))}</td>
+              <td class="border border-slate-200 px-2 py-1.5">${badge(item.source, SOURCE_STYLES, item.source)}</td>
+              <td class="border border-slate-200 px-2 py-1.5">${badge(item.priority || 'medium', PRIORITY_STYLES, item.priority || 'medium')}</td>
+              <td class="border border-slate-200 px-2 py-1.5 text-slate-700">${fmtContent(item.content)}</td>
+              ${hasEnd ? `<td class="border border-slate-200 px-2 py-1.5">${status ? badge(status, STATUS_STYLES, status) : ''}</td>` : ''}
+            </tr>`;
           });
-          panelsHtml += `</div></div>`;
+          panelsHtml += `</tbody></table></div></div>`;
         }
 
         // Friction
@@ -411,35 +426,27 @@
           </div>`;
         }
 
-        // Validation sections
-        const valSys = (iter.validation_system && iter.validation_system.items) || [];
-        const valUsr = (iter.validation_user && iter.validation_user.items) || [];
-        if (valSys.length > 0 || valUsr.length > 0) {
+        // Validation sections (merged format + backward compat)
+        let valItems = [];
+        if (iter.validation && iter.validation.items) {
+          valItems = iter.validation.items;
+        } else {
+          const valSys = (iter.validation_system && iter.validation_system.items) || [];
+          const valUsr = (iter.validation_user && iter.validation_user.items) || [];
+          valItems = [...valSys.map(i => ({...i, source: i.source || 'system'})), ...valUsr.map(i => ({...i, source: i.source || 'user'}))];
+        }
+        if (valItems.length > 0) {
           panelsHtml += `<div class="border border-slate-200 rounded-lg overflow-hidden">
             <div class="bg-slate-50 border-b border-slate-200 px-4 py-2"><span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Validation</span></div>
-            <div class="p-4 space-y-3">`;
-          if (valSys.length > 0) {
-            panelsHtml += `<div><p class="text-[10px] font-semibold text-violet-500 uppercase mb-1.5">System</p>`;
-            valSys.forEach(item => {
-              panelsHtml += `<div class="flex items-start gap-2 text-xs py-1">
-                <span class="mono text-slate-400 shrink-0 w-5">${esc(String(item.id))}</span>
-                ${item.priority ? badge(item.priority, PRIORITY_STYLES, item.priority) : ''}
-                <span class="text-slate-700 flex-1">${fmtContent(item.content)}</span>
-              </div>`;
-            });
-            panelsHtml += `</div>`;
-          }
-          if (valUsr.length > 0) {
-            panelsHtml += `<div><p class="text-[10px] font-semibold text-indigo-500 uppercase mb-1.5">User</p>`;
-            valUsr.forEach(item => {
-              panelsHtml += `<div class="flex items-start gap-2 text-xs py-1">
-                <span class="mono text-slate-400 shrink-0 w-5">${esc(String(item.id))}</span>
-                ${item.priority ? badge(item.priority, PRIORITY_STYLES, item.priority) : ''}
-                <span class="text-slate-700 flex-1">${fmtContent(item.content)}</span>
-              </div>`;
-            });
-            panelsHtml += `</div>`;
-          }
+            <div class="p-4 space-y-1.5">`;
+          valItems.forEach(item => {
+            panelsHtml += `<div class="flex items-start gap-2 text-xs py-1">
+              <span class="mono text-slate-400 shrink-0 w-5">${esc(String(item.id))}</span>
+              ${item.source ? badge(item.source, SOURCE_STYLES, item.source) : ''}
+              ${item.priority ? badge(item.priority, PRIORITY_STYLES, item.priority) : ''}
+              <span class="text-slate-700 flex-1">${fmtContent(item.content)}</span>
+            </div>`;
+          });
           panelsHtml += `</div></div>`;
         }
 

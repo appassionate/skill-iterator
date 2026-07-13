@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""package_skill.py — Package target_skill/ as a distributable zip archive.
+"""package.py — Package target_skill/ as a distributable zip archive.
 
 Creates a zip snapshot of the target skill directory, excluding .git/.
 The zip always uses the same filename, overwriting the previous iteration.
 
 Usage:
-    python package_skill.py --target target_skill/ --output skill-iterator.zip
-    python package_skill.py --target /path/to/target_skill --output my-skill.zip
-    python package_skill.py --target target_skill/   # auto-names from directory
+    python package.py --target target_skill/ --output skill-iterator.zip
+    python package.py --target /path/to/target_skill --output my-skill.zip
+    python package.py --target target_skill/   # auto-names from directory
 """
 
 import argparse

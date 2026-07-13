@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""setup_iter.py — Workspace scaffolding for iter_skill pipeline.
+"""setup.py — Workspace scaffolding for iter_skill pipeline.
 
 Sets up a new iteration directory and manages the target_skill/ git branch.
 The skill lives in target_skill/ at the workspace root as the single working
 copy — no per-iteration skill copies are created.
 
 Usage:
-    python setup_iter.py --base <workspace_path> --iter <N>
-    python setup_iter.py --base . --iter 7
+    python setup.py --base <workspace_path> --iter <N>
+    python setup.py --base . --iter 7
 """
 
 import argparse

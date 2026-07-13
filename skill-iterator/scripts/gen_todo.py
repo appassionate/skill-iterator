@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""generate_todo_html.py — Parse todo.md into data and render todo.html.
+"""gen_todo.py — Parse todo.md into data and render todo.html.
 
 Two-file output architecture:
   todo.md          -> parse -> todo.html       (self-contained HTML with embedded data)
@@ -9,7 +9,7 @@ Section names (current): start, end, validation-system, validation-user.
 Section names (legacy): begin, after — supported for backward compatibility.
 
 Usage:
-    python generate_todo_html.py --input todo.md --output todo.html
+    python gen_todo.py --input todo.md --output todo.html
 """
 
 import argparse
@@ -27,8 +27,7 @@ def parse_todo_md(text: str) -> dict:
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "start": {"items": []},
         "end": None,
-        "validation_system": None,
-        "validation_user": None,
+        "validation": None,
     }
 
     lines = text.strip().split("\n")
@@ -57,27 +56,39 @@ def parse_todo_md(text: str) -> dict:
                 data["end"] = end
             break
 
-    # Parse validation - system
-    for key in ("validation - system", "validation-system"):
+    # Parse validation section (merged system + user)
+    # Try new merged format first: "## validation"
+    for key in ("validation",):
         if key in sections:
-            items = _parse_val_system_table(sections[key])
+            items = _parse_val_merged_table(sections[key])
             if items:
-                data["validation_system"] = {"items": items}
+                data["validation"] = {"items": items}
             break
 
-    # Parse validation - user
-    for key in ("validation - user", "validation-user"):
-        if key in sections:
-            items = _parse_val_user_table(sections[key])
-            if items is not None:
-                data["validation_user"] = {"items": items}
-            break
+    # Fallback: merge from separate system/user sections (backward compat)
+    if data["validation"] is None:
+        merged_items = []
+        for key in ("validation - system", "validation-system"):
+            if key in sections:
+                items = _parse_val_system_table(sections[key])
+                for item in items:
+                    item["source"] = "system"
+                merged_items.extend(items)
+                break
+        for key in ("validation - user", "validation-user"):
+            if key in sections:
+                items = _parse_val_user_table(sections[key])
+                if items is not None:
+                    for item in items:
+                        item["source"] = "user"
+                    merged_items.extend(items)
+                break
+        if merged_items:
+            data["validation"] = {"items": merged_items}
 
     # Clean up None values
-    if data["validation_system"] is None:
-        del data["validation_system"]
-    if data["validation_user"] is None:
-        del data["validation_user"]
+    if data["validation"] is None:
+        del data["validation"]
 
     return data
 
@@ -160,10 +171,16 @@ def _parse_end_section(lines: list[str]) -> dict:
     if "items" in subsections:
         end["items"] = _parse_items_table(subsections["items"])
     else:
+        # Try legacy subsection names
         items = []
         for key in ("review", "validation generated"):
             if key in subsections:
                 items.extend(_parse_items_table(subsections[key]))
+        # If still no items, scan all lines for a table
+        if not items:
+            table_rows = _extract_table_rows(lines)
+            if table_rows:
+                items = _parse_items_table(lines)
         end["items"] = items
 
     return end
@@ -183,26 +200,40 @@ def _strip_id_prefix(raw_id: str) -> str:
     return stripped if stripped else raw_id.strip()
 
 
-def _detect_headers(row: list[str]) -> tuple[bool, bool]:
-    """Detect Status and Priority columns from header row."""
+def _detect_headers(row: list[str]) -> dict:
+    """Detect column presence and indices from header row."""
     headers = [c.strip().lower() for c in row]
-    return "status" in headers, "priority" in headers
+    result = {
+        "status": False, "priority": False, "solution": False,
+        "source": False, "content": False,
+        "col_map": {},
+    }
+    for i, h in enumerate(headers):
+        if h in ("status", "priority", "solution", "source", "content"):
+            result[h] = True
+            result["col_map"][h] = i
+    # Column 0 is always #
+    result["col_map"]["id"] = 0
+    return result
 
 
 def _parse_items_table(lines: list[str]) -> list[dict]:
     """Parse items table. Supports multiple formats via header detection.
 
-    Possible columns: #, Source, [Priority], [Status], Content
+    Uses column index map from headers when "content" header is present.
+    Falls back to positional parsing for old formats without explicit "content" header.
     """
     rows = _extract_table_rows(lines)
     items = []
 
-    has_status, has_priority = False, False
+    hdr = {"status": False, "priority": False, "solution": False, "source": False, "content": False, "col_map": {"id": 0}}
     for row in rows:
         if all(re.match(r"^[-:]+$", c.strip()) for c in row):
             continue
-        has_status, has_priority = _detect_headers(row)
+        hdr = _detect_headers(row)
         break
+
+    cm = hdr["col_map"]
 
     for i, row in enumerate(rows):
         if i == 0:
@@ -210,34 +241,47 @@ def _parse_items_table(lines: list[str]) -> list[dict]:
         if all(re.match(r"^[-:]+$", c.strip()) for c in row):
             continue
 
-        # Build column index map based on detected headers
         cols = [c.strip() for c in row]
         if len(cols) < 3:
             continue
 
-        item = {"id": _strip_id_prefix(cols[0])}
-        idx = 1
-
-        # Source column (always present in items tables)
-        if idx < len(cols):
-            item["source"] = _normalize_source(cols[idx])
-            idx += 1
-
-        # Optional Priority column
-        if has_priority and idx < len(cols):
-            item["priority"] = cols[idx]
-            idx += 1
-
-        # Optional Status column
-        if has_status and idx < len(cols):
-            item["status"] = cols[idx]
-            idx += 1
-
-        # Content column (always last)
-        if idx < len(cols):
-            item["content"] = cols[idx]
+        if hdr["content"]:
+            # Header-based column mapping (new format with explicit Content header)
+            item = {"id": _strip_id_prefix(cols[cm["id"]])}
+            item["content"] = cols[cm["content"]] if cm.get("content", -1) < len(cols) else ""
+            if hdr["source"] and cm.get("source", -1) < len(cols):
+                item["source"] = _normalize_source(cols[cm["source"]])
+            if hdr["priority"] and cm.get("priority", -1) < len(cols):
+                item["priority"] = cols[cm["priority"]]
+            if hdr["status"] and cm.get("status", -1) < len(cols):
+                item["status"] = cols[cm["status"]]
+            if hdr["solution"] and cm.get("solution", -1) < len(cols):
+                item["solution"] = cols[cm["solution"]]
         else:
-            continue
+            # Positional parsing (old format without explicit Content header)
+            item = {"id": _strip_id_prefix(cols[0])}
+            idx = 1
+
+            if hdr["source"] and idx < len(cols):
+                item["source"] = _normalize_source(cols[idx])
+                idx += 1
+
+            if hdr["priority"] and idx < len(cols):
+                item["priority"] = cols[idx]
+                idx += 1
+
+            if hdr["status"] and idx < len(cols):
+                item["status"] = cols[idx]
+                idx += 1
+
+            if hdr["solution"] and idx < len(cols):
+                item["solution"] = cols[idx]
+                idx += 1
+
+            if idx < len(cols):
+                item["content"] = cols[idx]
+            else:
+                item["content"] = ""
 
         items.append(item)
     return items
@@ -255,7 +299,8 @@ def _parse_val_system_table(lines: list[str]) -> list[dict]:
     for row in rows:
         if all(re.match(r"^[-:]+$", c.strip()) for c in row):
             continue
-        has_status, _ = _detect_headers(row)
+        hdr = _detect_headers(row)
+        has_status = hdr["status"]
         break
 
     for i, row in enumerate(rows):
@@ -297,7 +342,9 @@ def _parse_val_user_table(lines: list[str]) -> list[dict]:
             continue
         if all(re.match(r"^[-:]+$", c.strip()) for c in row):
             continue
-        has_status, has_priority = _detect_headers(row)
+        hdr = _detect_headers(row)
+        has_status = hdr["status"]
+        has_priority = hdr["priority"]
         break
 
     for i, row in enumerate(rows):
@@ -324,6 +371,52 @@ def _parse_val_user_table(lines: list[str]) -> list[dict]:
                 "id": _strip_id_prefix(cols[0]),
                 "content": cols[1],
             })
+    return items
+
+
+def _parse_val_merged_table(lines: list[str]) -> list[dict]:
+    """Parse merged validation table with Source, Priority, Content columns."""
+    rows = _extract_table_rows(lines)
+    items = []
+
+    has_priority = False
+    has_source = False
+    for row in rows:
+        headers = [c.strip().lower() for c in row]
+        if all(re.match(r"^[-:]+$", c.strip()) for c in row):
+            continue
+        has_source = "source" in headers
+        has_priority = "priority" in headers
+        break
+
+    for i, row in enumerate(rows):
+        if i == 0:
+            continue
+        if all(re.match(r"^[-:]+$", c.strip()) for c in row):
+            continue
+
+        cols = [c.strip() for c in row]
+        if len(cols) < 2:
+            continue
+
+        item = {"id": _strip_id_prefix(cols[0])}
+        idx = 1
+
+        if has_source and idx < len(cols):
+            item["source"] = _normalize_source(cols[idx])
+            idx += 1
+
+        if has_priority and idx < len(cols):
+            item["priority"] = cols[idx]
+            idx += 1
+
+        if idx < len(cols):
+            item["content"] = cols[idx]
+        else:
+            item["content"] = ""
+
+        items.append(item)
+
     return items
 
 
@@ -378,9 +471,9 @@ def generate(input_path: Path, output_path: Path) -> None:
     # Load HTML template
     template_path = _find_template(input_path)
     if not template_path:
-        print("Error: Could not find todo_template.html. Searched:")
-        print("  - assets/todo_template.html (relative to this script)")
-        print("  - ../assets/todo_template.html (relative to this script)")
+        print("Error: Could not find todo.html. Searched:")
+        print("  - assets/todo.html (relative to this script)")
+        print("  - ../assets/todo.html (relative to this script)")
         sys.exit(1)
 
     template = template_path.read_text(encoding="utf-8")
@@ -393,13 +486,13 @@ def generate(input_path: Path, output_path: Path) -> None:
 
 
 def _find_template(input_path: Path) -> Path | None:
-    """Locate todo_template.html, searching relative to the script and input."""
+    """Locate todo.html, searching relative to the script and input."""
     script_dir = Path(__file__).resolve().parent
 
     candidates = [
-        script_dir / "assets" / "todo_template.html",
-        script_dir.parent / "assets" / "todo_template.html",
-        input_path.parent / "assets" / "todo_template.html",
+        script_dir / "assets" / "todo.html",
+        script_dir.parent / "assets" / "todo.html",
+        input_path.parent / "assets" / "todo.html",
     ]
 
     for path in candidates:
