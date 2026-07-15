@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Todo</title>
+  <title>Iter</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
@@ -20,7 +20,7 @@
   <header class="bg-slate-900 text-white px-6 py-4">
     <div class="max-w-5xl mx-auto flex justify-between items-center">
       <div>
-        <h1 class="text-xl font-bold" id="header-title">Todo</h1>
+        <h1 class="text-xl font-bold" id="header-title">Iter</h1>
         <p class="text-slate-400 text-sm mt-0.5" id="header-meta"></p>
       </div>
       <div class="text-right text-sm" id="header-stats"></div>
@@ -66,6 +66,10 @@
           <h3 class="text-sm font-semibold text-slate-600 mb-1.5">Items</h3>
           <div class="overflow-x-auto" id="items-table"></div>
         </div>
+        <div id="end-changelog" class="hidden">
+          <h3 class="text-sm font-semibold text-slate-600 mb-1.5">Changelog</h3>
+          <div class="overflow-x-auto" id="changelog-table"></div>
+        </div>
       </div>
     </section>
 
@@ -105,7 +109,7 @@
 
   </main>
 
-  <script id="todo-data">
+  <script id="iter-data">
   const TODO_DATA = __TODO_DATA__;
   </script>
   <script>
@@ -196,6 +200,22 @@
         h += tdCell(fmtContent(f.difficulty));
         h += tdCell(fmtContent(f.root_cause));
         h += tdCell(fmtContent(f.resolution));
+        h += '</tr>';
+      });
+      h += '</tbody></table>';
+      return h;
+    }
+
+    function renderChangelogTable(changelog) {
+      if (!changelog || changelog.length === 0) return '';
+      let h = '<table class="min-w-full text-sm border-collapse"><thead><tr>';
+      h += thCell('File', '200px') + thCell('Change') + thCell('Why');
+      h += '</tr></thead><tbody>';
+      changelog.forEach(c => {
+        h += '<tr>';
+        h += tdCell(`<code class="bg-slate-100 px-1.5 py-0.5 rounded text-xs">${esc(c.file)}</code>`);
+        h += tdCell(fmtContent(c.change));
+        h += tdCell(fmtContent(c.why));
         h += '</tr>';
       });
       h += '</tbody></table>';
@@ -370,15 +390,15 @@
         document.getElementById('header-meta').textContent = 'No data embedded.';
         document.getElementById('start-table').innerHTML =
           '<div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">' +
-          '<strong>Data not loaded.</strong> Ensure todo data is embedded in this HTML file. ' +
+          '<strong>Data not loaded.</strong> Ensure iteration data is embedded in this HTML file. ' +
           'Generate it with: ' +
-          '<code class="bg-amber-100 px-1 rounded">python gen_todo.py --input data_todo.json --output todo.html</code>' +
+          '<code class="bg-amber-100 px-1 rounded">python show_iter.py --input iter.json --output iter.html</code>' +
           '</div>';
         return;
       }
 
-      document.title = `Todo: ${data.iteration}`;
-      document.getElementById('header-title').textContent = `Todo: ${data.iteration}`;
+      document.title = `Iter: ${data.iteration}`;
+      document.getElementById('header-title').textContent = `Iter: ${data.iteration}`;
       document.getElementById('header-meta').textContent = data.generated_at
         ? `Generated: ${data.generated_at}` : '';
 
@@ -409,6 +429,10 @@
           document.getElementById('items-table').innerHTML = renderSolutionsTable(endItems);
         } else {
           document.getElementById('end-items').classList.add('hidden');
+        }
+        if (end.changelog && end.changelog.length > 0) {
+          document.getElementById('end-changelog').classList.remove('hidden');
+          document.getElementById('changelog-table').innerHTML = renderChangelogTable(end.changelog);
         }
       }
 

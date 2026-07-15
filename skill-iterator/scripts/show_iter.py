@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""gen_todo.py — Render data_todo.json into a self-contained todo.html.
+"""show_iter.py — Render iter.json into a self-contained iter.html.
 
 Reads structured JSON data and embeds it into the HTML template.
-The HTML template (assets/todo.html) is located relative to this script.
+The HTML template (assets/iter.html) is located relative to this script.
 
 Usage:
-    python gen_todo.py --input data_todo.json --output todo.html
+    python show_iter.py --input iter.json --output iter.html
 """
 
 import argparse
@@ -16,7 +16,7 @@ from pathlib import Path
 
 
 def generate(input_path: Path, output_path: Path) -> None:
-    """Read data_todo.json, embed into HTML template, write todo.html."""
+    """Read iter.json, embed into HTML template, write iter.html."""
     if not input_path.exists():
         print(f"Error: {input_path} does not exist.")
         sys.exit(1)
@@ -32,9 +32,9 @@ def generate(input_path: Path, output_path: Path) -> None:
     # Load HTML template
     template_path = _find_template()
     if not template_path:
-        print("Error: Could not find assets/todo.html. Searched:")
-        print("  - assets/todo.html (relative to this script)")
-        print("  - ../assets/todo.html (relative to this script)")
+        print("Error: Could not find assets/iter.html. Searched:")
+        print("  - assets/iter.html (relative to this script)")
+        print("  - ../assets/iter.html (relative to this script)")
         sys.exit(1)
 
     template = template_path.read_text(encoding="utf-8")
@@ -47,11 +47,11 @@ def generate(input_path: Path, output_path: Path) -> None:
 
 
 def _find_template() -> Path | None:
-    """Locate assets/todo.html relative to this script."""
+    """Locate assets/iter.html relative to this script."""
     script_dir = Path(__file__).resolve().parent
     candidates = [
-        script_dir.parent / "assets" / "todo.html",
-        script_dir / "assets" / "todo.html",
+        script_dir.parent / "assets" / "iter.html",
+        script_dir / "assets" / "iter.html",
     ]
     for path in candidates:
         if path.exists():
@@ -61,10 +61,10 @@ def _find_template() -> Path | None:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Render data_todo.json into a self-contained todo.html."
+        description="Render iter.json into a self-contained iter.html."
     )
     parser.add_argument(
-        "--input", type=Path, required=True, help="Path to data_todo.json"
+        "--input", type=Path, required=True, help="Path to iter.json"
     )
     parser.add_argument(
         "--output", type=Path, required=True, help="Output HTML path"

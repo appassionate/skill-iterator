@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""setup.py — Workspace scaffolding for iter_skill pipeline.
+"""setup_iter.py — Workspace scaffolding for iter_skill pipeline.
 
 Sets up a new iteration directory and manages the target_skill/ git branch.
 The skill lives in target_skill/ at the workspace root as the single working
 copy — no per-iteration skill copies are created.
 
 Usage:
-    python setup.py --base <workspace_path> --iter <N>
-    python setup.py --base . --iter 7
+    python setup_iter.py --base <workspace_path> --iter <N>
+    python setup_iter.py --base . --iter 7
 """
 
 import argparse
@@ -15,7 +15,32 @@ import subprocess
 import sys
 from pathlib import Path
 
-from _common import count_lines
+
+def count_lines(directory: Path) -> dict[str, int]:
+    """Count lines in SKILL.md, references/*.md, and scripts/*.py files."""
+    counts = {}
+    skill_md = directory / "SKILL.md"
+    if skill_md.exists():
+        counts["SKILL.md"] = sum(
+            1 for _ in skill_md.open(encoding="utf-8", errors="replace")
+        )
+
+    refs_dir = directory / "references"
+    if refs_dir.exists():
+        for f in sorted(refs_dir.glob("*.md")):
+            counts[f"references/{f.name}"] = sum(
+                1 for _ in f.open(encoding="utf-8", errors="replace")
+            )
+
+    scripts_dir = directory / "scripts"
+    if scripts_dir.exists():
+        for f in sorted(scripts_dir.glob("*.py")):
+            counts[f"scripts/{f.name}"] = sum(
+                1 for _ in f.open(encoding="utf-8", errors="replace")
+            )
+
+    counts["Total"] = sum(v for k, v in counts.items() if k != "Total")
+    return counts
 
 
 def ensure_git(target_skill: Path) -> None:
@@ -71,11 +96,10 @@ def setup_iteration(base: Path, iter_num: int) -> None:
     # Ensure git is initialized
     ensure_git(target_skill)
 
-    # Create iteration directory structure (execute + validation + summarize)
+    # Create iteration directory structure
     dirs = [
         iter_dir / "01.train" / "execute",
         iter_dir / "02.validation",
-        iter_dir / "03.summarize",
     ]
     for d in dirs:
         d.mkdir(parents=True, exist_ok=True)

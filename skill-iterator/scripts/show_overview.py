@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""gen_overview.py — Generate overview.html from iteration data.
+"""show_overview.py — Generate overview.html from iteration data.
 
-Scans iter.XXXX directories, collects data_todo.json from each,
+Scans iter.XXXX directories, collects iter.json from each,
 reads SKILL.md for metadata, lists scripts and assets, then
 generates a self-contained overview.html with embedded data.
 
 Usage:
-    python gen_overview.py --workspace iter_skill(skill-iterator) --output overview.html
+    python show_overview.py --workspace iter_skill(skill-iterator) --output overview.html
 """
 
 import argparse
@@ -26,7 +26,7 @@ def find_iterations(workspace: Path) -> list[dict]:
         if not m:
             continue
 
-        json_path = d / "data_todo.json"
+        json_path = d / "iter.json"
         if not json_path.exists():
             continue
 
