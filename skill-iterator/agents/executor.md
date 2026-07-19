@@ -61,7 +61,7 @@ For each rawdata item, follow the skill's instructions faithfully:
    {
      "item": "<rawdata item name>",
      "timestamp": "2026-07-14T10:23:45+08:00",
-     "category": "ambiguous | missing | broken | wrong_assumption | edge_case",
+     "category": "ambiguous | missing | incorrect | environmental | edge_case",
      "friction": "The skill says 'process the data appropriately' but doesn't define what format the output should be in",
      "workaround": "Assumed CSV format based on the input file extension and produced output.csv",
      "severity": "high | medium | low",
@@ -72,8 +72,8 @@ For each rawdata item, follow the skill's instructions faithfully:
    **Category definitions:**
    - `ambiguous`: Instruction is unclear, multiple interpretations possible
    - `missing`: Skill doesn't cover a situation that arose during execution
-   - `broken`: Script or instruction produces an error or wrong result
-   - `wrong_assumption`: Skill assumes something that isn't true for this rawdata item
+   - `incorrect`: Instruction or script produces wrong results or is factually wrong for this case
+   - `environmental`: External factor — missing dependencies, data issues, config problems
    - `edge_case`: Valid but unusual input that the skill doesn't handle gracefully
 
    **Severity guide:**
@@ -102,18 +102,14 @@ Save `train_path/train.json` combining friction entries and execution summary:
     }
   ],
   "summary": {
-    "items_processed": 3,
-    "items_succeeded": 2,
-    "items_failed": 1,
     "item_results": [
       {"name": "sample-report.pdf", "status": "succeeded"},
       {"name": "scanned-image.png", "status": "failed", "failure_reason": "OCR script crashed on scanned format"},
       {"name": "data-export.csv", "status": "succeeded"}
     ],
-    "friction_count": 4,
-    "friction_by_severity": {"high": 1, "medium": 2, "low": 1},
-    "friction_by_category": {"ambiguous": 2, "missing": 1, "broken": 1},
-    "scripts_created": ["process_data.py"],
+    "scripts_created": [
+      {"name": "process_data.py", "purpose": "Convert input data to standardized format"}
+    ],
     "notes": "OCR script needs better error handling for non-standard image formats"
   }
 }

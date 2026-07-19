@@ -13,8 +13,6 @@
     .nav-link.active { background: #1e293b; color: #fff; }
     .panel { display: none; }
     .panel.active { display: block; }
-    .donut-segment { transition: opacity 0.2s; }
-    .donut-segment:hover { opacity: 0.8; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
@@ -49,22 +47,14 @@
         <h2 class="text-lg font-bold text-slate-800 mb-4">Overview</h2>
 
         <!-- Skill Info Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" id="skill-info-grid"></div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6" id="skill-info-grid"></div>
 
-        <!-- Status Distribution Across Iterations -->
-        <div class="border border-slate-200 rounded-lg overflow-hidden mb-6" id="section-status-chart">
+        <!-- Iteration Summary Table -->
+        <div class="border border-slate-200 rounded-lg overflow-hidden mb-6" id="section-iter-summary">
           <div class="bg-slate-50 border-b border-slate-200 px-4 py-2.5">
-            <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Status Distribution</span>
+            <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Iteration Summary</span>
           </div>
-          <div class="p-4" id="status-chart-container"></div>
-        </div>
-
-        <!-- File Tree -->
-        <div class="border border-slate-200 rounded-lg overflow-hidden mb-6" id="section-file-tree">
-          <div class="bg-slate-50 border-b border-slate-200 px-4 py-2.5">
-            <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">File Structure</span>
-          </div>
-          <div class="p-4" id="file-tree-container"></div>
+          <div class="p-4" id="iter-summary-container"></div>
         </div>
 
         <!-- Scripts -->
@@ -109,14 +99,6 @@
       dropped:  'bg-red-50 text-red-600 border-red-200',
     };
 
-    const STATUS_COLORS = {
-      done:     '#10b981',
-      plan:     '#3b82f6',
-      pending:  '#f59e0b',
-      deferred: '#94a3b8',
-      dropped:  '#ef4444',
-    };
-
     const SOURCE_STYLES = {
       user:   'bg-indigo-50 text-indigo-700 border-indigo-200',
       system: 'bg-violet-50 text-violet-700 border-violet-200',
@@ -150,84 +132,45 @@
       if (panel) panel.classList.add('active');
     }
 
-    // --- Donut Chart ---
-    function donutChart(statusCounts, size) {
-      size = size || 120;
-      const total = Object.values(statusCounts).reduce((s, v) => s + v, 0);
-      if (total === 0) return '<p class="text-xs text-slate-400 italic">No data</p>';
-      const r = size / 2 - 10;
-      const cx = size / 2, cy = size / 2;
-      const circumference = 2 * Math.PI * r;
-      let offset = 0;
-      let segments = '';
-      let legend = '';
+    // --- Iteration Summary Table ---
+    function renderIterSummary(iters) {
+      if (!iters || iters.length === 0) return '<p class="text-xs text-slate-400 italic">No iterations.</p>';
 
-      const statuses = ['done', 'plan', 'pending', 'deferred', 'dropped'];
-      statuses.forEach(status => {
-        const count = statusCounts[status] || 0;
-        if (count === 0) return;
-        const pct = count / total;
-        const dash = circumference * pct;
-        const color = STATUS_COLORS[status] || '#94a3b8';
-        segments += `<circle class="donut-segment" cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="16" stroke-dasharray="${dash} ${circumference - dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"/>`;
-        offset += dash;
-        legend += `<div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background:${color}"></span><span class="text-xs text-slate-600">${status}</span><span class="mono text-xs text-slate-400">${count}</span></div>`;
-      });
+      let h = '<table class="min-w-full text-xs border-collapse"><thead><tr>';
+      h += '<th class="bg-slate-50 border border-slate-200 px-3 py-1.5 text-left font-semibold text-slate-500 uppercase">Iteration</th>';
+      h += '<th class="bg-slate-50 border border-slate-200 px-3 py-1.5 text-left font-semibold text-slate-500 uppercase w-20">Total</th>';
+      h += '<th class="bg-slate-50 border border-slate-200 px-3 py-1.5 text-left font-semibold text-slate-500 uppercase w-20">Done</th>';
+      h += '<th class="bg-slate-50 border border-slate-200 px-3 py-1.5 text-left font-semibold text-slate-500 uppercase w-24">Progress</th>';
+      h += '<th class="bg-slate-50 border border-slate-200 px-3 py-1.5 text-left font-semibold text-slate-500 uppercase w-20">Friction</th>';
+      h += '</tr></thead><tbody>';
 
-      return `<div class="flex items-center gap-6">
-        <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${segments}
-          <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" class="text-lg font-bold" fill="#334155">${total}</text>
-        </svg>
-        <div class="space-y-1.5">${legend}</div>
-      </div>`;
-    }
-
-    // --- Stacked Bar Chart for all iterations ---
-    function stackedBarChart(iters) {
-      const statuses = ['done', 'plan', 'pending', 'deferred', 'dropped'];
-      let rows = '';
       iters.forEach(iter => {
-        const endSection = iter.end || iter.after || {};
-        const startSection = iter.start || iter.begin || {};
+        const endSection = iter.end || {};
+        const startSection = iter.start || {};
         const endItems = endSection.items || [];
         const startItems = startSection.items || [];
         const items = endItems.length > 0 ? endItems : startItems;
         const total = items.length;
-        if (total === 0) return;
+        const done = endItems.filter(i => i.status === 'done').length;
+        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+        const frictionCount = (endSection.friction || []).length;
 
-        const counts = {};
-        statuses.forEach(s => counts[s] = items.filter(i => (i.status || (endItems.length === 0 ? 'pending' : '')).replace(/.*/, () => i.status || (endItems.length === 0 ? '' : '')) === s).length);
-        // Recount properly
-        statuses.forEach(s => counts[s] = 0);
-        items.forEach(item => {
-          const st = item.status || '';
-          if (counts[st] !== undefined) counts[st]++;
-        });
-        if (endItems.length === 0) counts.pending = total; // in-progress iter
-
-        let barSegments = '';
-        statuses.forEach(s => {
-          if (counts[s] === 0) return;
-          const w = (counts[s] / total) * 100;
-          barSegments += `<div class="h-5" style="width:${w}%;background:${STATUS_COLORS[s]}" title="${s}: ${counts[s]}"></div>`;
-        });
-
-        rows += `<div class="flex items-center gap-3">
-          <span class="mono text-xs text-slate-500 w-20 shrink-0">${esc(iter.iteration)}</span>
-          <div class="flex flex-1 rounded overflow-hidden bg-slate-100">${barSegments}</div>
-          <span class="mono text-xs text-slate-400 w-10 text-right">${total}</span>
-        </div>`;
+        h += '<tr>';
+        h += `<td class="border border-slate-200 px-3 py-1.5 mono text-slate-700">${esc(iter.iteration)}</td>`;
+        h += `<td class="border border-slate-200 px-3 py-1.5 mono text-slate-600">${total}</td>`;
+        h += `<td class="border border-slate-200 px-3 py-1.5 mono text-slate-600">${done}</td>`;
+        h += `<td class="border border-slate-200 px-3 py-1.5">
+          <div class="flex items-center gap-2">
+            <div class="flex-1 bg-slate-100 rounded-full h-1.5"><div class="${pct === 100 ? 'bg-emerald-500' : 'bg-blue-500'} h-1.5 rounded-full" style="width:${pct}%"></div></div>
+            <span class="mono text-slate-400">${pct}%</span>
+          </div>
+        </td>`;
+        h += `<td class="border border-slate-200 px-3 py-1.5 mono ${frictionCount > 0 ? 'text-amber-600' : 'text-slate-400'}">${frictionCount}</td>`;
+        h += '</tr>';
       });
 
-      if (!rows) return '';
-
-      let legendHtml = '<div class="flex gap-4 mt-3">';
-      statuses.forEach(s => {
-        legendHtml += `<div class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded" style="background:${STATUS_COLORS[s]}"></span><span class="text-xs text-slate-500">${s}</span></div>`;
-      });
-      legendHtml += '</div>';
-
-      return `<div class="space-y-2">${rows}</div>${legendHtml}`;
+      h += '</tbody></table>';
+      return h;
     }
 
     // --- Render Overview Panel ---
@@ -253,23 +196,16 @@
       document.getElementById('header-stats').innerHTML = `
         <div class="text-center"><span class="mono font-bold text-white block">${iters.length}</span><span class="text-[10px] text-slate-400 uppercase">iters</span></div>
         <div class="text-center"><span class="mono font-bold text-white block">${totalDone}/${totalItems}</span><span class="text-[10px] text-slate-400 uppercase">done</span></div>
-        <div class="text-center"><span class="mono font-bold text-white block">${skill.skill_lines || '-'}</span><span class="text-[10px] text-slate-400 uppercase">lines</span></div>
       `;
 
       // Skill info cards
       let gridHtml = '';
       gridHtml += `<div class="bg-white border border-slate-200 rounded-lg p-3"><p class="text-[10px] font-semibold text-slate-400 uppercase mb-1">Name</p><p class="text-sm font-medium text-slate-800">${esc(skill.name || 'N/A')}</p></div>`;
-      gridHtml += `<div class="bg-white border border-slate-200 rounded-lg p-3"><p class="text-[10px] font-semibold text-slate-400 uppercase mb-1">SKILL.md</p><p class="text-sm mono font-medium text-slate-800">${skill.skill_lines || 'N/A'} lines</p></div>`;
       gridHtml += `<div class="bg-white border border-slate-200 rounded-lg p-3"><p class="text-[10px] font-semibold text-slate-400 uppercase mb-1">Description</p><p class="text-xs text-slate-600 leading-relaxed">${esc(skill.description || 'N/A')}</p></div>`;
       document.getElementById('skill-info-grid').innerHTML = gridHtml;
 
-      // Status distribution chart
-      document.getElementById('status-chart-container').innerHTML = stackedBarChart(iters);
-
-      // File tree
-      if (skill.file_tree) {
-        document.getElementById('file-tree-container').innerHTML = `<pre class="text-xs text-slate-600 leading-relaxed bg-slate-50 rounded-lg p-3 overflow-x-auto">${esc(skill.file_tree)}</pre>`;
-      }
+      // Iteration summary table
+      document.getElementById('iter-summary-container').innerHTML = renderIterSummary(iters);
 
       // Scripts
       const scripts = data.scripts || [];
@@ -338,22 +274,10 @@
           </div>`;
         }
 
-        // Stats row with donut
-        const statusCounts = {};
-        if (hasEnd) {
-          endItems.forEach(i => { const s = i.status || ''; statusCounts[s] = (statusCounts[s] || 0) + 1; });
-        }
+        // Stats row
         const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
-        panelsHtml += `<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">`;
-        panelsHtml += `<div class="bg-white border border-slate-200 rounded-lg p-4 flex items-center gap-4">`;
-        if (hasEnd) {
-          panelsHtml += donutChart(statusCounts, 100);
-        } else {
-          panelsHtml += `<div class="text-center w-full"><span class="text-xs text-amber-600 italic">In progress</span><br><span class="mono text-2xl font-bold text-slate-700">${total}</span><span class="text-xs text-slate-400 ml-1">items</span></div>`;
-        }
-        panelsHtml += `</div>`;
-
+        panelsHtml += `<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">`;
         panelsHtml += `<div class="bg-white border border-slate-200 rounded-lg p-4">
           <p class="text-[10px] font-semibold text-slate-400 uppercase mb-2">Completion</p>
           <p class="mono text-2xl font-bold ${pct === 100 ? 'text-emerald-600' : 'text-slate-700'}">${done}/${total}</p>

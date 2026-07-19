@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Validation</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
+    code, .mono { font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; }
+    .nav-link { display: block; padding: 6px 12px; border-radius: 6px; font-size: 13px; color: #64748b; transition: all 0.15s; }
+    .nav-link:hover { background: #f1f5f9; color: #334155; }
+    .nav-link.active { background: #1e293b; color: #fff; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+  <!-- Header -->
+  <header class="bg-slate-900 text-white px-6 py-4 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto flex justify-between items-center">
+      <div>
+        <h1 class="text-lg font-bold" id="header-title">Validation</h1>
+        <p class="text-slate-400 text-xs mt-0.5" id="header-meta"></p>
+      </div>
+      <div class="flex gap-5 text-sm" id="header-stats"></div>
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto flex">
+
+    <!-- Sidebar -->
+    <nav class="w-48 shrink-0 sticky top-[60px] h-[calc(100vh-60px)] overflow-y-auto border-r border-slate-200 bg-white p-3 space-y-1">
+      <a href="#benchmark" class="nav-link active" data-panel="panel-benchmark" onclick="switchPanel(this)">Benchmark</a>
+      <a href="#generalization" class="nav-link" data-panel="panel-generalization" onclick="switchPanel(this)">Generalization</a>
+      <a href="#automation" class="nav-link" data-panel="panel-automation" onclick="switchPanel(this)">Automation</a>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-6 space-y-6 min-w-0">
+
+      <!-- ════════ Benchmark Panel ════════ -->
+      <div class="panel active" id="panel-benchmark">
+        <h2 class="text-lg font-bold text-slate-800 mb-4">Benchmark</h2>
+
+        <div class="border border-slate-200 rounded-lg overflow-hidden mb-4" id="section-performance">
+          <div class="bg-slate-50 border-b border-slate-200 px-4 py-2.5">
+            <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Performance Metrics</span>
+          </div>
+          <div class="p-4 overflow-x-auto" id="performance-table"></div>
+        </div>
+
+        <div class="border border-slate-200 rounded-lg overflow-hidden" id="section-assessment">
+          <div class="bg-slate-50 border-b border-slate-200 px-4 py-2.5">
+            <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Assessment Snapshot</span>
+          </div>
+          <div class="p-4 overflow-x-auto" id="assessment-table"></div>
+        </div>
+      </div>
+
+      <!-- ════════ Generalization Panel ════════ -->
+      <div class="panel" id="panel-generalization">
+        <h2 class="text-lg font-bold text-slate-800 mb-4">Generalization</h2>
+
+        <div class="border border-slate-200 rounded-lg overflow-hidden" id="section-strategies">
+          <div class="bg-slate-50 border-b border-slate-200 px-4 py-2.5">
+            <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Strategies</span>
+          </div>
+          <div class="p-4 overflow-x-auto" id="strategies-table"></div>
+        </div>
+      </div>
+
+      <!-- ════════ Automation Panel ════════ -->
+      <div class="panel" id="panel-automation">
+        <h2 class="text-lg font-bold text-slate-800 mb-4">Automation</h2>
+
+        <div class="border border-slate-200 rounded-lg overflow-hidden mb-4" id="section-tedium">
+          <div class="bg-slate-50 border-b border-slate-200 px-4 py-2.5">
+            <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Tedium Analysis</span>
+          </div>
+          <div class="p-4 overflow-x-auto" id="tedium-table"></div>
+        </div>
+
+        <div class="border border-slate-200 rounded-lg overflow-hidden mb-4" id="section-opportunities">
+          <div class="bg-slate-50 border-b border-slate-200 px-4 py-2.5">
+            <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Automation Opportunities</span>
+          </div>
+          <div class="p-4 overflow-x-auto" id="opportunities-table"></div>
+        </div>
+
+        <div class="border border-slate-200 rounded-lg overflow-hidden" id="section-scripts">
+          <div class="bg-slate-50 border-b border-slate-200 px-4 py-2.5">
+            <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Scripts</span>
+          </div>
+          <div class="p-4 overflow-x-auto" id="scripts-table"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script id="validation-data">
+  const DATA = __DATA__;
+  </script>
+  <script>
+
+    /* ── shared helpers ── */
+
+    const RATING_STYLES = {
+      strong:   'bg-emerald-50 text-emerald-700 border-emerald-200',
+      adequate: 'bg-blue-50 text-blue-700 border-blue-200',
+      weak:     'bg-amber-50 text-amber-700 border-amber-200',
+      missing:  'bg-red-50 text-red-600 border-red-200',
+    };
+
+    const PRIORITY_STYLES = {
+      high:   'bg-red-50 text-red-700 border-red-200',
+      medium: 'bg-amber-50 text-amber-700 border-amber-200',
+      low:    'bg-slate-100 text-slate-600 border-slate-200',
+    };
+
+    const STATUS_STYLES = {
+      planned:  'bg-blue-50 text-blue-700 border-blue-200',
+      done:     'bg-emerald-50 text-emerald-700 border-emerald-200',
+      deferred: 'bg-slate-100 text-slate-500 border-slate-200',
+    };
+
+    function badge(text, styleMap, key) {
+      const cls = styleMap[key] || 'bg-slate-50 text-slate-600 border-slate-200';
+      return `<span class="inline-block text-xs font-medium px-2 py-0.5 rounded border ${cls}">${esc(text)}</span>`;
+    }
+
+    function esc(text) {
+      const d = document.createElement('div');
+      d.textContent = text || '';
+      return d.innerHTML;
+    }
+
+    function fmtContent(text) {
+      let s = esc(text);
+      s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+      s = s.replace(/`(.+?)`/g, '<code class="bg-slate-100 px-1 py-0.5 rounded text-xs">$1</code>');
+      return s;
+    }
+
+    function thCell(text, w) {
+      const style = w ? ` style="width:${w}"` : '';
+      return `<th class="bg-slate-50 border border-slate-200 px-3 py-2 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide"${style}>${esc(text)}</th>`;
+    }
+
+    function tdCell(html, cls) {
+      return `<td class="border border-slate-200 px-3 py-2 align-top text-sm ${cls || ''}">${html}</td>`;
+    }
+
+    function switchPanel(el) {
+      document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      el.classList.add('active');
+      const panel = document.getElementById(el.getAttribute('data-panel'));
+      if (panel) panel.classList.add('active');
+    }
+
+    /* ── Benchmark renderers ── */
+
+    function renderPerformanceTable(items) {
+      if (!items || items.length === 0) return '<p class="text-sm text-slate-400 italic">No performance data.</p>';
+      let h = '<table class="min-w-full text-sm border-collapse"><thead><tr>';
+      h += thCell('Metric') + thCell('Current', '150px');
+      h += '</tr></thead><tbody>';
+      items.forEach(item => {
+        h += '<tr>';
+        h += tdCell(fmtContent(item.metric));
+        h += tdCell(`<span class="mono text-xs text-slate-700 font-medium">${esc(item.current)}</span>`);
+        h += '</tr>';
+      });
+      h += '</tbody></table>';
+      return h;
+    }
+
+    function renderAssessmentTable(items) {
+      if (!items || items.length === 0) return '<p class="text-sm text-slate-400 italic">No assessment data.</p>';
+      let h = '<table class="min-w-full text-sm border-collapse"><thead><tr>';
+      h += thCell('Dimension', '180px') + thCell('Rating', '120px') + thCell('Key Issue');
+      h += '</tr></thead><tbody>';
+      items.forEach(item => {
+        h += '<tr>';
+        h += tdCell(fmtContent(item.dimension));
+        h += tdCell(badge(item.rating || 'adequate', RATING_STYLES, item.rating || 'adequate'));
+        h += tdCell(fmtContent(item.issue));
+        h += '</tr>';
+      });
+      h += '</tbody></table>';
+      return h;
+    }
+
+    /* ── Generalization renderers ── */
+
+    function renderStrategiesTable(items) {
+      if (!items || items.length === 0) return '<p class="text-sm text-slate-400 italic">No strategies.</p>';
+      let h = '<table class="min-w-full text-sm border-collapse"><thead><tr>';
+      h += thCell('#', '50px') + thCell('Problem') + thCell('Strategy') + thCell('Recommendation');
+      h += '</tr></thead><tbody>';
+      items.forEach((item, i) => {
+        h += '<tr>';
+        h += tdCell(`<span class="mono text-xs text-slate-500">${i + 1}</span>`);
+        h += tdCell(fmtContent(item.problem));
+        h += tdCell(fmtContent(item.strategy));
+        h += tdCell(fmtContent(item.recommendation));
+        h += '</tr>';
+      });
+      h += '</tbody></table>';
+      return h;
+    }
+
+    /* ── Automation renderers ── */
+
+    function renderTediumTable(items) {
+      if (!items || items.length === 0) return '<p class="text-sm text-slate-400 italic">No tedium entries.</p>';
+      let h = '<table class="min-w-full text-sm border-collapse"><thead><tr>';
+      h += thCell('#', '50px') + thCell('Step') + thCell('Root Cause');
+      h += '</tr></thead><tbody>';
+      items.forEach((item, i) => {
+        h += '<tr>';
+        h += tdCell(`<span class="mono text-xs text-slate-500">${i + 1}</span>`);
+        h += tdCell(fmtContent(item.step));
+        h += tdCell(fmtContent(item.root_cause));
+        h += '</tr>';
+      });
+      h += '</tbody></table>';
+      return h;
+    }
+
+    function renderOpportunitiesTable(items) {
+      if (!items || items.length === 0) return '<p class="text-sm text-slate-400 italic">No opportunities.</p>';
+      let h = '<table class="min-w-full text-sm border-collapse"><thead><tr>';
+      h += thCell('#', '50px') + thCell('Step') + thCell('Approach') + thCell('Priority', '100px') + thCell('Status', '100px');
+      h += '</tr></thead><tbody>';
+      items.forEach((item, i) => {
+        h += '<tr>';
+        h += tdCell(`<span class="mono text-xs text-slate-500">${i + 1}</span>`);
+        h += tdCell(fmtContent(item.step));
+        h += tdCell(fmtContent(item.approach));
+        h += tdCell(badge(item.priority || 'medium', PRIORITY_STYLES, item.priority || 'medium'));
+        h += tdCell(badge(item.status || 'planned', STATUS_STYLES, item.status || 'planned'));
+        h += '</tr>';
+      });
+      h += '</tbody></table>';
+      return h;
+    }
+
+    function renderScriptsTable(items) {
+      if (!items || items.length === 0) return '<p class="text-sm text-slate-400 italic">No scripts.</p>';
+      let h = '<table class="min-w-full text-sm border-collapse"><thead><tr>';
+      h += thCell('Name', '200px') + thCell('Location', '200px') + thCell('Purpose');
+      h += '</tr></thead><tbody>';
+      items.forEach(item => {
+        h += '<tr>';
+        h += tdCell(`<code class="bg-slate-100 px-1.5 py-0.5 rounded text-xs">${esc(item.name)}</code>`);
+        h += tdCell(`<span class="mono text-xs text-slate-500">${esc(item.location)}</span>`);
+        h += tdCell(fmtContent(item.purpose));
+        h += '</tr>';
+      });
+      h += '</tbody></table>';
+      return h;
+    }
+
+    /* ── Main render ── */
+
+    function render() {
+      if (!DATA) {
+        document.getElementById('header-meta').textContent = 'No data embedded.';
+        return;
+      }
+
+      const iter = DATA.iteration || '';
+      document.title = `Validation: ${iter}`;
+      document.getElementById('header-title').textContent = `Validation`;
+      document.getElementById('header-meta').textContent = DATA.generated_at
+        ? `${iter} — Generated: ${DATA.generated_at}` : iter;
+
+      // Header stats
+      const bm = DATA.benchmark || {};
+      const assessment = bm.assessment || [];
+      const strong = assessment.filter(a => a.rating === 'strong').length;
+      const gen = DATA.generalization || {};
+      const strategies = gen.strategies || [];
+      const auto = DATA.automation || {};
+      const opps = auto.opportunities || [];
+      const done = opps.filter(o => o.status === 'done').length;
+
+      document.getElementById('header-stats').innerHTML = `
+        <div class="text-center"><span class="mono font-bold text-white block">${strong}/${assessment.length}</span><span class="text-[10px] text-slate-400 uppercase">strong</span></div>
+        <div class="text-center"><span class="mono font-bold text-white block">${strategies.length}</span><span class="text-[10px] text-slate-400 uppercase">strategies</span></div>
+        <div class="text-center"><span class="mono font-bold text-white block">${done}/${opps.length}</span><span class="text-[10px] text-slate-400 uppercase">auto done</span></div>
+      `;
+
+      // Benchmark
+      document.getElementById('performance-table').innerHTML = renderPerformanceTable(bm.performance);
+      document.getElementById('assessment-table').innerHTML = renderAssessmentTable(assessment);
+
+      // Generalization
+      document.getElementById('strategies-table').innerHTML = renderStrategiesTable(strategies);
+
+      // Automation
+      document.getElementById('tedium-table').innerHTML = renderTediumTable(auto.tedium);
+      document.getElementById('opportunities-table').innerHTML = renderOpportunitiesTable(opps);
+      document.getElementById('scripts-table').innerHTML = renderScriptsTable(auto.scripts);
+    }
+
+    render();
+  </script>
+</body>
+</html>

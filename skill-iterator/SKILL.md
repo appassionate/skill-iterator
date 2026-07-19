@@ -110,26 +110,24 @@ iter_skill({target_skill_name})/    # Always create a new workspace directory na
 ├── target_skill/                   # Complete target skill — the single working copy (git-managed)
 │   ├── .git/                       # Git repository — one branch per iteration (iter.XXXX)
 │   ├── SKILL.md                    # continuous developing: target_skill SKILL.md
-│   ├── assets/                     # continuous developing: Static HTML templates (iter.html, overview.html)
-│   ├── references/                 # continuous developing: usually makrdown of target_skill
+│   ├── assets/                     # continuous developing: target_skill Static HTML templates 
+│   ├── references/                 # continuous developing: target_skill reference markdown content
 │   └── scripts/                    # continuous developing: scripts used by target_skill
 ├── iter.0001/
 │   ├── iter.json                   # Structured JSON iteration record (source of truth)
 │   ├── iter.html                   # Self-contained HTML viewer with embedded data
 │   ├── 01.train/
-│   │   ├── execute/              # Direct output directory — skill deliverables
-│   │   │   └── scripts/          # Reusable scripts created during execution
-│   │   └── train.json            # Friction entries + execution summary (merged)
+│   │   ├── execute/              # Target skill's working directory — ALL outputs from running the skill go here
+│   │   │   ├── scripts/          # Reusable scripts created during execution
+│   │   │   └── (all deliverables produced by target skill)
+│   │   ├── train.json            # Friction entries + execution summary (merged)
+│   │   └── train.html            # Self-contained HTML viewer with embedded data (auto-generated from train.json)
 │   └── 02.validation/
-│       ├── generalization.json   # Source data: problem → solution → generalized strategy
-│       ├── generalization.html   # Self-contained HTML viewer (auto-generated from JSON)
-│       ├── benchmark.json        # Source data: assessment snapshot + performance metrics
-│       ├── benchmark.html        # Self-contained HTML viewer (auto-generated from JSON)
-│       ├── automation.json       # Source data: tedium analysis + automation opportunities
-│       └── automation.html       # Self-contained HTML viewer (auto-generated from JSON)
+│       ├── validation.json         # Merged validation data: benchmark + generalization + automation
+│       └── validation.html         # Self-contained HTML viewer with sidebar nav (auto-generated from JSON)
 ├── iter.0002/                      # (same structure; target_skill/ persists across iterations)
 ├── iter.NNNN/
-├── overview.html                   # Iteration overview with sidebar nav, charts, file tree (auto-generated)
+├── overview.html                   # Iteration overview with sidebar nav and summary table (auto-generated)
 └── {target_skill_name}.zip         # Latest packaged snapshot of target_skill/ (excludes .git/)
 ```
 
@@ -139,9 +137,9 @@ iter_skill({target_skill_name})/    # Always create a new workspace directory na
 - **Git — one branch per iteration.** `iter.XXXX` branches track each iteration's changes. *(See Stage 2: Seed)*
 - **rawdata/ — complete input archive, read-only.** *(See Step 2: Parse User Input)*
 - **iter.json — drives the iteration.** Created first, referenced throughout, verified at the end. *(See Stage 1)*
-- **01.train/ — training workspace.** `execute/` holds deliverables; `train.json` holds friction + summary. *(See Stage 2)*
-- **02.validation/ — three validation artifacts.** Do not skip or rush — Stage 4 depends on their analysis. *(See Stage 3)*
-- **Package after each iteration.** Run `python package.py` at Stage 5 to keep zip current. *(See Stage 5)*
+- **01.train/ — training workspace.** `execute/` holds deliverables; `train.json` holds friction + summary; `train.html` renders them. *(See Stage 2)*
+- **02.validation/ — merged validation artifact.** `validation.json` holds benchmark + generalization + automation; `validation.html` renders them with sidebar nav. Do not skip or rush — Stage 4 depends on this analysis. *(See Stage 3)*
+- **Package after each iteration.** Run `zip -r {name}.zip target_skill/ -x 'target_skill/.git/*'` at Stage 5 to keep zip current. *(See Stage 5)*
 
 ---
 
@@ -163,29 +161,12 @@ Each iteration follows: **Prepare → Train → Validate → Summarize → Final
 
 ### Stage 1: Prepare (`iter.json`)
 
-Create `iter.json` — the structured iteration record. Schema:
-
-```json
-{
-  "iteration": "iter.XXXX",
-  "generated_at": "YYYY-MM-DD HH:MM UTC",
-  "start": {
-    "prompt": "Full original user request, verbatim",
-    "items": [
-      { "id": "1", "source": "user", "priority": "high", "content": "decomposed task" },
-      { "id": "2", "source": "system", "priority": "medium", "content": "carryover from prior iter" }
-    ]
-  },
-  "end": null,
-  "validation": null
-}
-```
+Create `iter.json` — the structured iteration record.
+Schema: `references/schemas.md` (iter.json section).
 
 **`start.prompt`** — the user's original request, preserved verbatim.
 
-**`start.items`** — the prompt decomposed into small, actionable items. Fields:
-`id` (sequential number), `source` (`user` or `system`), `priority` (`high`/`medium`/`low`),
-`content` (task description). The original prompt text does NOT appear in items.
+**`start.items`** — the prompt decomposed into small, actionable items. The original prompt text does NOT appear in items.
 
 **Priority inheritance:** Items carried over from prior iterations inherit the priority from the previous `validation` section. User-prompt items get priority based on the user's analysis.
 
@@ -210,20 +191,27 @@ Each `iter.html` is fully self-contained with embedded data.
 against every rawdata item. The sub-agent operates in isolation — it has no access to
 the orchestrator's conversation history. It receives only the parameters below.
 
+**`execute/` is the target skill's working directory.** All outputs produced by running the target skill — documents, reports, generated code, intermediate data, scripts — MUST be written inside `01.train/execute/` but any other directory in current iteration.
+
 **Spawn prompt template:**
 
 ```
 Execute this skill against rawdata items:
 - Skill path: <workspace>/target_skill/SKILL.md
 - Rawdata path: <workspace>/rawdata/
+- Working directory: <workspace>/iter.XXXX/01.train/execute/
 - Train path: <workspace>/iter.XXXX/01.train/
 - Read agents/executor.md for your operating instructions
 - Task context: <what this iteration is testing, if applicable>
+ALL outputs must be written to the working directory above.
 ```
 
 The sub-agent reads `agents/executor.md` as its operating instructions, loads the
 target skill's SKILL.md, processes each rawdata item, and writes outputs to `execute/`,
-friction + summary to `train.json`.
+friction + summary to `train.json`. Schema: `references/schemas.md` (train.json section).
+
+**HTML output:** After the sub-agent writes `train.json`, generate the HTML viewer:
+`python show_train.py --input train.json --output train.html`.
 
 **When to delegate vs execute inline vs skip:**
 - **Delegate** (preferred): The target skill has executable tasks (file processing, report generation, data transformation, code execution).
@@ -248,7 +236,7 @@ friction + summary to `train.json`.
    validation checks), extract it into a reusable Python script and persist it in
    `execute/`. Subsequent iterations should invoke the script rather than redo the
    work manually. This reduces friction, eliminates drift between iterations, and produces
-   concrete artifacts that feed generalization.html. When in doubt, prefer Python — it has the
+   concrete artifacts that feed validation.json. When in doubt, prefer Python — it has the
    broadest ecosystem for the data-processing and file-manipulation tasks typical in skill
    training.
 
@@ -274,14 +262,16 @@ This stage directly determines the quality of all subsequent stages. Rushing it 
 
 **Core principle: make implicit workflow steps explicit.** During training, the model often relies on assumptions — unstated steps, implicit data formats, or reasoning shortcuts that worked but were never documented. Validation is where those hidden dependencies must surface.
 
-Stage 3 produces three JSON data files and their HTML viewers in `02.validation/`. For each artifact, write the JSON data file first, then generate the HTML viewer:
-`python show_validation.py --template {name} --input {name}.json --output {name}.html`
+Stage 3 produces one merged JSON file and its HTML viewer in `02.validation/`. Write `validation.json` first, then generate the HTML viewer:
+`python show_validation.py --input validation.json --output validation.html`
 
-**1. Generalization (`generalization.json` → `generalization.html`):** For each problem encountered, document: the specific problem, how it was solved, and the **generalized strategy** — the broader principle that applies beyond this specific case. This artifact is where concrete friction points become reusable knowledge. JSON schema: `{ "iteration", "generated_at", "strategies": [{ "id", "problem", "solution", "strategy", "recommendation" }], "notes" }`.
+Schema: `references/schemas.md` (validation.json section). The file contains three sections:
 
-**2. Benchmark (`benchmark.json` → `benchmark.html`):** Tracks the target skill's health across iterations: performance metrics (rawdata pass rate, friction count, line counts), assessment snapshot (6-dimension ratings), and generalization metrics (strategies generated vs applied, carryover resolution rate). JSON schema: `{ "iteration", "generated_at", "performance": [{ "metric", "previous", "current", "delta" }], "assessment": [{ "dimension", "rating", "issue" }], "generalization": [{ "metric", "value", "notes" }] }`.
+**`benchmark`** — performance metrics (rawdata pass rate, friction count, line counts) and 6-dimension assessment snapshot (ratings from Stage 2 Evaluate).
 
-**3. Automation (`automation.json` → `automation.html`):** Review **all** iterations' `01.train/execute` directories — not just the current one — and reflect on three questions: (1) Which steps were tedious or repetitive? (2) What made them tedious? (3) How could a Python script automate them? Prioritize automating steps that recur across iterations. Automation candidates should be promoted into `target_skill/scripts/` when they prove stable. JSON schema: `{ "iteration", "generated_at", "tedium": [{ "id", "iterations", "step", "root_cause" }], "opportunities": [{ "id", "step", "approach", "priority", "status" }], "scripts": [{ "name", "location", "purpose", "status" }], "notes" }`.
+**`generalization`** — for each problem encountered, document: the specific problem and the **generalized strategy** — the broader principle that applies beyond this specific case. This is where concrete friction points become reusable knowledge.
+
+**`automation`** — review **all** iterations' `01.train/execute` directories — not just the current one — and reflect on three questions: (1) Which steps were tedious or repetitive? (2) What made them tedious? (3) How could a Python script automate them? Prioritize automating steps that recur across iterations. Automation candidates should be promoted into `target_skill/scripts/` when they prove stable.
 
 ### Stage 4: Summarize (`iter.json "end"`)
 
@@ -289,22 +279,14 @@ This stage synthesizes validation results. It depends on Stage 3 being complete.
 
 **1. Fill in `iter.json` "end" and "validation" sections:** Re-read every file in `01.train/` (train.json, execute/ outputs) **and all validation artifacts**. Update `iter.json` with:
 
-**End section (SOLUTIONS):**
+**End section (SOLUTIONS):** Schema: `references/schemas.md` (iter.json → end section).
 - **`end.walkthrough`** — one paragraph overview of how the skill performed against rawdata.
-- **`end.friction`** — array of objects: `{ "item", "difficulty", "root_cause", "resolution" }`.
-- **`end.items`** — SOLUTIONS items. Each corresponds to a requirements item by matching `id` (1:1 mapping). Fields:
-  - `id`: same sequential number as the matching requirement.
-  - `content`: the original requirement text (used as hover tooltip in HTML).
-  - `status`: `done`, `plan`, `pending`, `deferred`, `dropped`.
-  - `solution`: one sentence recording how the requirement was fulfilled.
-- **`end.changelog`** — array of `{ "file", "change", "why" }` from `git diff iter.(XXXX-1)..iter.XXXX` inside `target_skill/`. Rendered as a Changelog table (File / Change / Why) in the SOLUTIONS section of iter.html.
+- **`end.friction`** — friction encountered during training with root cause and resolution.
+- **`end.items`** — SOLUTIONS items. Each corresponds to a `start.items` requirement by matching `id` (1:1 mapping). `solution`: one sentence recording how the requirement was fulfilled.
+- **`end.changelog`** — changes from `git diff iter.(XXXX-1)..iter.XXXX` inside `target_skill/`. Rendered as a Changelog table (File / Change / Why) in the SOLUTIONS section of iter.html.
 
-**Validation section:**
-- **`validation.items`** — array of `{ "id", "source", "priority", "content" }`.
-  - `source`: `system` for auto-generated carryover, `user` for user-added.
-  - `priority`: `high` (blocks next iteration), `medium` (should address soon), `low` (nice to have). Editable via dropdown in HTML.
-  - System items become the carryover source for the next iteration's start section.
-  - The HTML viewer provides **Render** (LLM prompt modal with Copy), **Reset** (restore original state), and **+ Add** (append new item) buttons.
+**Validation section:** Schema: `references/schemas.md` (iter.json → validation section).
+- **`validation.items`** — carryover items for the next iteration. System items become the carryover source for the next iteration's `start.items`.
 
 After updating `iter.json`, regenerate the HTML: `python show_iter.py --input iter.json --output iter.html`.
 
@@ -321,7 +303,7 @@ The improved skill is already in `target_skill/` from Stage 2 — there is no se
 7. **Review changes:** Verify all changes from the iteration (see `end.changelog`) are intentional and well-documented.
 8. Commit the final state on the iteration branch (`git add -A && git commit`).
 9. **Generate overview:** Run `python show_overview.py --workspace . --output overview.html` from the workspace root.
-10. **Package target_skill/** by running `python package.py --target target_skill/ --output {target_skill_name}.zip` from the workspace root.
+10. **Package target_skill/** by running `zip -r {target_skill_name}.zip target_skill/ -x 'target_skill/.git/*'` from the workspace root.
 
 **Alternate outcomes:** If the assessment concluded the skill should be split rather than iterated, the output is a decomposition plan (identifying split boundaries and proposed new skills) instead of an improved single skill.
 

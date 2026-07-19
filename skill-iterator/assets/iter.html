@@ -8,10 +8,6 @@
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
     code, .mono { font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; }
-    .content-cell { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-    .content-tooltip { position: fixed; z-index: 50; max-width: 480px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); padding: 12px; font-size: 13px; line-height: 1.5; pointer-events: auto; }
-    .content-tooltip .copy-btn { display: inline-block; margin-top: 8px; font-size: 11px; background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 4px; cursor: pointer; border: 1px solid #e2e8f0; }
-    .content-tooltip .copy-btn:hover { background: #e2e8f0; }
   </style>
 </head>
 <body class="bg-white text-slate-800 min-h-screen">
@@ -73,39 +69,15 @@
       </div>
     </section>
 
-    <!-- Validation Section (merged system + user) -->
+    <!-- Validation Section (read-only) -->
     <section class="border border-slate-200 rounded-lg overflow-hidden" id="section-validation">
-      <div class="bg-slate-50 border-b border-slate-200 px-4 py-2.5 flex justify-between items-center">
+      <div class="bg-slate-50 border-b border-slate-200 px-4 py-2.5">
         <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">Validation</span>
-        <div class="flex gap-2">
-          <button onclick="resetValidation()" class="text-xs bg-slate-200 text-slate-700 px-3 py-1 rounded hover:bg-slate-300 transition-colors">Reset</button>
-          <button onclick="addValidationItem()" class="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-500 transition-colors">+ Add</button>
-          <button onclick="renderPrompt()" class="text-xs bg-violet-600 text-white px-3 py-1 rounded hover:bg-violet-500 transition-colors">Render</button>
-        </div>
       </div>
       <div class="p-4">
         <div class="overflow-x-auto" id="val-table"></div>
       </div>
     </section>
-
-    <!-- Render Prompt Modal -->
-    <div id="render-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col">
-        <div class="flex justify-between items-center px-5 py-3 border-b border-slate-200">
-          <h2 class="text-sm font-semibold text-slate-700 uppercase tracking-wide">Validation Prompt</h2>
-          <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 transition-colors">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
-        </div>
-        <div class="px-5 py-4 overflow-y-auto flex-1">
-          <pre id="render-prompt-text" class="text-sm leading-relaxed text-slate-700 whitespace-pre-wrap font-sans"></pre>
-        </div>
-        <div class="px-5 py-3 border-t border-slate-200 flex justify-end gap-2">
-          <button onclick="copyPrompt()" class="text-xs bg-slate-800 text-white px-4 py-1.5 rounded hover:bg-slate-700 transition-colors">Copy</button>
-          <button onclick="closeModal()" class="text-xs bg-slate-200 text-slate-700 px-4 py-1.5 rounded hover:bg-slate-300 transition-colors">Close</button>
-        </div>
-      </div>
-    </div>
 
   </main>
 
@@ -159,10 +131,6 @@
 
     function tdCell(html, cls) {
       return `<td class="border border-slate-200 px-3 py-2 align-top text-sm ${cls || ''}">${html}</td>`;
-    }
-
-    function deleteBtn(section, id) {
-      return `<button onclick="deleteItem('${section}', '${esc(String(id))}')" class="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded hover:bg-red-100 transition-colors">Delete</button>`;
     }
 
     function renderItemsTable(items, opts) {
@@ -225,163 +193,38 @@
     function renderSolutionsTable(items) {
       if (!items || items.length === 0) return '<p class="text-sm text-slate-400 italic">No items.</p>';
       let h = '<table class="min-w-full text-sm border-collapse"><thead><tr>';
-      h += '<th class="bg-slate-50 border border-slate-200 px-3 py-2 text-left text-xs font-semibold text-slate-600 uppercase" style="width:50px">#</th>';
-      h += '<th class="bg-slate-50 border border-slate-200 px-3 py-2 text-left text-xs font-semibold text-slate-600 uppercase" style="width:80px">Status</th>';
-      h += '<th class="bg-slate-50 border border-slate-200 px-3 py-2 text-left text-xs font-semibold text-slate-600 uppercase">Solution</th>';
+      h += thCell('#', '50px') + thCell('Status', '100px') + thCell('Content') + thCell('Solution');
       h += '</tr></thead><tbody>';
       items.forEach(item => {
-        h += '<tr class="group">';
-        h += `<td class="border border-slate-200 px-3 py-2 align-top relative"><span class="mono text-xs text-slate-500 cursor-help border-b border-dashed border-slate-300" onmouseenter="showHoverTip(this, ${JSON.stringify(item.content)})" onmouseleave="hideHoverTip()">${esc(String(item.id))}</span></td>`;
-        h += `<td class="border border-slate-200 px-3 py-2 align-top">${item.status ? badge(item.status, STATUS_STYLES, item.status) : ''}</td>`;
-        h += `<td class="border border-slate-200 px-3 py-2 align-top text-sm text-slate-700">${item.solution ? fmtContent(item.solution) : '<span class="text-slate-300 italic">—</span>'}</td>`;
+        h += '<tr>';
+        h += tdCell(`<span class="mono text-xs text-slate-500">${esc(String(item.id))}</span>`);
+        h += tdCell(item.status ? badge(item.status, STATUS_STYLES, item.status) : '');
+        h += tdCell(`<span class="text-slate-600 text-xs">${fmtContent(item.content || '')}</span>`);
+        h += tdCell(item.solution ? fmtContent(item.solution) : '<span class="text-slate-300 italic">—</span>');
         h += '</tr>';
       });
       h += '</tbody></table>';
       return h;
     }
 
-    function showHoverTip(el, text) {
-      hideHoverTip();
-      const rect = el.getBoundingClientRect();
-      const tip = document.createElement('div');
-      tip.id = 'hover-tip';
-      tip.className = 'content-tooltip';
-      tip.innerHTML = '<div>' + esc(text) + '</div><span class="copy-btn" onclick="event.stopPropagation();navigator.clipboard.writeText(this.parentElement.querySelector(\'div\').textContent);this.textContent=\'Copied!\';">Copy</span>';
-      tip.style.left = Math.min(rect.left, window.innerWidth - 500) + 'px';
-      tip.style.top = (rect.bottom + 4) + 'px';
-      tip.addEventListener('mouseenter', function() { clearTimeout(tip._hideTimer); });
-      tip.addEventListener('mouseleave', hideHoverTip);
-      document.body.appendChild(tip);
-    }
-
-    function hideHoverTip() {
-      const tip = document.getElementById('hover-tip');
-      if (tip) {
-        tip._hideTimer = setTimeout(function() { tip.remove(); }, 150);
-      }
-    }
-
-    function prioritySelect(section, idx, current) {
-      return `<select onchange="updatePriority('${section}', ${idx}, this.value)" class="text-xs border border-slate-300 rounded px-2 py-1 bg-white">` +
-        ['high','medium','low'].map(p =>
-          `<option value="${p}" ${current === p ? 'selected' : ''}>${p}</option>`
-        ).join('') + '</select>';
-    }
-
     function renderValTable(items) {
       let h = '<table class="min-w-full text-sm border-collapse"><thead><tr>';
-      h += thCell('#', '50px') + thCell('Source', '100px') + thCell('Priority', '120px') + thCell('Content') + thCell('Actions', '80px');
+      h += thCell('#', '50px') + thCell('Source', '100px') + thCell('Priority', '100px') + thCell('Content');
       h += '</tr></thead><tbody>';
       if (!items || items.length === 0) {
-        h += '<tr><td colspan="5" class="border border-slate-200 px-3 py-4 text-center text-sm text-slate-400 italic">No validation items. Click "+ Add" to create one.</td></tr>';
+        h += '<tr><td colspan="4" class="border border-slate-200 px-3 py-4 text-center text-sm text-slate-400 italic">No validation items.</td></tr>';
       } else {
-        items.forEach((item, idx) => {
+        items.forEach(item => {
           h += '<tr>';
           h += tdCell(`<span class="mono text-xs text-slate-500">${esc(String(item.id))}</span>`);
           h += tdCell(badge(item.source || 'system', SOURCE_STYLES, item.source || 'system'));
-          h += tdCell(prioritySelect('validation', idx, item.priority || 'medium'));
-          h += `<td class="border border-slate-200 px-1 py-1 align-top"><textarea onchange="updateValidationContent(${idx}, this.value)" class="w-full text-sm border-0 resize-y min-h-[36px] focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-2 py-1">${esc(item.content)}</textarea></td>`;
-          h += tdCell(deleteBtn('validation', item.id));
+          h += tdCell(badge(item.priority || 'medium', PRIORITY_STYLES, item.priority || 'medium'));
+          h += tdCell(fmtContent(item.content));
           h += '</tr>';
         });
       }
       h += '</tbody></table>';
       return h;
-    }
-
-    // --- Interactive operations ---
-
-    function deleteItem(section, id) {
-      if (!TODO_DATA[section] || !TODO_DATA[section].items) return;
-      TODO_DATA[section].items = TODO_DATA[section].items.filter(i => String(i.id) !== String(id));
-      renderValidation();
-    }
-
-    function addValidationItem() {
-      if (!TODO_DATA.validation) TODO_DATA.validation = { items: [] };
-      const maxId = TODO_DATA.validation.items.reduce((m, i) => {
-        const n = parseInt(String(i.id).replace(/\D/g, '')); return n > m ? n : m;
-      }, 0);
-      TODO_DATA.validation.items.push({ id: String(maxId + 1), source: 'user', priority: 'medium', content: '' });
-      renderValidation();
-      setTimeout(() => {
-        const tas = document.querySelectorAll('#val-table textarea');
-        if (tas.length > 0) tas[tas.length - 1].focus();
-      }, 50);
-    }
-
-    function updateValidationContent(idx, value) {
-      if (TODO_DATA.validation && TODO_DATA.validation.items[idx]) {
-        TODO_DATA.validation.items[idx].content = value;
-      }
-    }
-
-    function updatePriority(section, idx, value) {
-      if (TODO_DATA[section] && TODO_DATA[section].items[idx]) {
-        TODO_DATA[section].items[idx].priority = value;
-      }
-    }
-
-    function renderPrompt() {
-      const valItems = (TODO_DATA.validation && TODO_DATA.validation.items) || [];
-
-      const priorityOrder = { high: 0, medium: 1, low: 2 };
-      const sortByPriority = (a, b) => (priorityOrder[a.priority] ?? 1) - (priorityOrder[b.priority] ?? 1);
-
-      let text = `# Carryover Validation Items — ${TODO_DATA.iteration || 'unknown'}\n\n`;
-      text += `Each item includes: [priority] (importance level), [source] (origin: system-generated or user-defined), and the item content.\n\n`;
-
-      if (valItems.length > 0) {
-        [...valItems].sort(sortByPriority).forEach(item => {
-          text += `- [priority: ${item.priority || 'medium'}] [source: ${item.source || 'system'}] ${item.content}\n`;
-        });
-        text += '\n';
-      } else {
-        text += 'No validation items to carry over.\n';
-      }
-
-      document.getElementById('render-prompt-text').textContent = text;
-      document.getElementById('render-modal').classList.remove('hidden');
-    }
-
-    function closeModal() {
-      document.getElementById('render-modal').classList.add('hidden');
-    }
-
-    function copyPrompt() {
-      const text = document.getElementById('render-prompt-text').textContent;
-      navigator.clipboard.writeText(text).catch(() => {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-      });
-    }
-
-    document.addEventListener('click', function(e) {
-      if (e.target.id === 'render-modal') closeModal();
-    });
-
-    document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') closeModal();
-    });
-
-    let INITIAL_VALIDATION = null;
-
-    function renderValidation() {
-      const valItems = (TODO_DATA.validation && TODO_DATA.validation.items) || [];
-      document.getElementById('val-table').innerHTML = renderValTable(valItems);
-    }
-
-    function resetValidation() {
-      if (INITIAL_VALIDATION) {
-        TODO_DATA.validation = JSON.parse(JSON.stringify(INITIAL_VALIDATION));
-      } else {
-        TODO_DATA.validation = { items: [] };
-      }
-      renderValidation();
     }
 
     function render() {
@@ -436,12 +279,8 @@
         }
       }
 
-      // Save initial validation state for Reset button
-      if (data.validation) {
-        INITIAL_VALIDATION = JSON.parse(JSON.stringify(data.validation));
-      }
-
-      renderValidation();
+      const valItems = (data.validation && data.validation.items) || [];
+      document.getElementById('val-table').innerHTML = renderValTable(valItems);
     }
 
     render();

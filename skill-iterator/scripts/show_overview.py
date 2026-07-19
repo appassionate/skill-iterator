@@ -63,31 +63,6 @@ def parse_skill_md(skill_path: Path) -> dict:
     return info
 
 
-def build_file_tree(root: Path, max_depth: int = 3) -> str:
-    """Build a text-based file tree of the target_skill directory."""
-    lines = [root.name + "/"]
-    _walk_tree(root, "", lines, max_depth, 0)
-    return "\n".join(lines)
-
-
-def _walk_tree(directory: Path, prefix: str, lines: list, max_depth: int, depth: int) -> None:
-    """Recursively walk directory tree and append formatted lines."""
-    if depth >= max_depth:
-        return
-    entries = sorted(directory.iterdir(), key=lambda p: (not p.is_dir(), p.name))
-    # Filter out .git and __pycache__
-    entries = [e for e in entries if e.name not in (".git", "__pycache__", ".DS_Store")]
-    for i, entry in enumerate(entries):
-        is_last = i == len(entries) - 1
-        connector = "└── " if is_last else "├── "
-        if entry.is_dir():
-            lines.append(f"{prefix}{connector}{entry.name}/")
-            extension = "    " if is_last else "│   "
-            _walk_tree(entry, prefix + extension, lines, max_depth, depth + 1)
-        else:
-            lines.append(f"{prefix}{connector}{entry.name}")
-
-
 def list_scripts(scripts_dir: Path) -> list[dict]:
     """List Python scripts with line counts."""
     scripts = []
@@ -96,7 +71,6 @@ def list_scripts(scripts_dir: Path) -> list[dict]:
     for f in sorted(scripts_dir.iterdir()):
         if f.suffix == ".py" and not f.name.startswith("_"):
             lines = len(f.read_text(encoding="utf-8").split("\n"))
-            # Extract docstring first line as description
             text = f.read_text(encoding="utf-8")
             desc_m = re.search(r'"""(.+?)(?:\n|$)', text)
             desc = desc_m.group(1).strip() if desc_m else ""
@@ -128,7 +102,6 @@ def generate(workspace: Path, output_path: Path) -> None:
     # Collect data
     iterations = find_iterations(workspace)
     skill_info = parse_skill_md(target_skill / "SKILL.md")
-    skill_info["file_tree"] = build_file_tree(target_skill)
     scripts = list_scripts(target_skill / "scripts")
     assets = list_assets(target_skill / "assets", target_skill / "references")
 
